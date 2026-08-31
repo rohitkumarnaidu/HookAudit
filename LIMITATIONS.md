@@ -45,24 +45,18 @@ An attacker who **avoids every one** of those five signals (no network call, no 
 
 **The real safety net is `baseline/diff`:** *Any* change to a tracked hook file is reported as `CHANGED`/`NEW`/`REMOVED` regardless of its heuristic score. Even a “clean-looking” one-liner edit creates drift.
 
-## 4. No Shell / Language Parsing — Only Static String Inspection
+## 4. No Full Shell / Language Parsing — Bounded Static Analysis
 
-HookAudit **does not** contain:
+HookAudit does **not** contain a full shell AST, JS/Python interpreter, or PowerShell parser. It normalizes commands to `CommandSpec{raw, executable, args, shell, references}` via light tokenization and regex, and resolves `config → script → script` statically up to `MAX_GRAPH_DEPTH=32` with cycle (`CYCLE_DETECTED`) and depth guards — never executing target code.
 
-- a shell AST parser,
-- a JavaScript/Python interpreter,
-- a PowerShell parser,
-- a full command-line argument parser.
+Correctly handled (now implemented):
+- `path = process.env.X + "/setup.sh"` → `DYNAMIC_EXECUTION` / `UNRESOLVED_REFERENCE` with `LOW` confidence + `BOUNDARY_VIOLATION` if outside root (resolver via `resolveInsideRepository`).
+- `command = variableA + variableB` → `DYNAMIC_EXECUTION` + `PARTIALLY_RESOLVED` where appropriate.
+- `config → script A → script B → capability` is followed as a multi-hop execution graph (`SCRIPT` nodes, `REFERENCES` edges, `ExecutionPath[]` with `capabilities` + `risk` + `confidence`). Verified via `multi-hop` fixture (`NETWORK_ACCESS` reachable).
 
-It treats command strings as **opaque text** and applies regex heuristics. Consequences:
+We will never build a general-purpose interpreter — only a bounded resolver. Anything requiring runtime evaluation remains `DYNAMIC_EXECUTION`/`UNRESOLVED_REFERENCE` with evidence.
 
-- `command = variableA + variableB` → flagged as `DYNAMIC`/`UNRESOLVED` ideally, but today may be undetected or only partially flagged.
-- `path = process.env.X + "/setup.sh"` → dynamic path → should become `UNRESOLVED_REFERENCE`, but resolver not yet implemented (Day-2).
-- Composed commands across files (`config → script A → script B → capability`) are **not yet followed** as a multi-hop graph. Only direct config-file commands are scored today. The execution graph (`config → script A → script B → capability`) is the Day-2 core (see `RULES.md:42`).
-
-We will never build a general-purpose interpreter — only a bounded resolver with cycle detection and `MAX_GRAPH_DEPTH=32`.
-
-## 5. Dynamic Code & Dynamic Paths
+## 5. Dynamic Code & Dynamic Paths (now explicit)
 
 When static analysis encounters:
 
@@ -72,19 +66,24 @@ command = variableA + variableB
 path = process.env.X + "/setup.sh"
 ```
 
-it **must not guess**. Correct behavior (spec `§25`):
+it **must not guess** — implemented:
 
 ```
-DYNAMIC_EXECUTION or UNRESOLVED_REFERENCE + evidence
+DYNAMIC_EXECUTION + UNRESOLVED_REFERENCE/PARTIALLY_RESOLVED + evidence + LOW confidence
 ```
 
-Current build: obfuscation detection catches `eval(` / `new Function(` / `atob(`, but fully variable-constructed commands and environment-generated paths are not yet labeled with a distinct `DYNAMIC` state — they may simply score lower. This will be elevated to an explicit confidence/diagnostic in Day-2.
+Obfuscation (`eval(`, `new Function(`, `atob`, 200-char base64) → `OBFUSCATION`/`DYNAMIC_EXECUTION` with evidence. Variable-constructed paths → `DYNAMIC_EXECUTION` + `BOUNDARY_VIOLATION`/`UNRESOLVED_REFERENCE` via `resolveInsideRepository`, confidence `LOW`.
 
-Preferred wording after fix:
+Example output (implemented):
 
 ```
-Risk: HIGH
-Confidence: MEDIUM — potential impact high, but static interpretation incomplete (dynamic construction)
+Severity: HIGH
+Confidence: LOW
+Trigger: SessionStart
+Path: .claude/settings.json → ${process.env.HOOK}/setup.sh (DYNAMIC)
+Capabilities: DYNAMIC_EXECUTION
+Evidence: dynamic reference ${process.env.HOOK}/setup.sh
+Why: potential impact high but static interpretation incomplete (dynamic construction)
 ```
 
 ## 6. Unsupported Ecosystems
@@ -120,7 +119,7 @@ HookAudit never fetches remote URLs, never executes extracted commands, never lo
 | Multi-branch worm | Check out each branch and re-scan, or await the git-native walker (Day-2 stretch). |
 | New commit after trust | `hookaudit diff .` on every pull/checkout — any `NEW`/`CHANGED`/`REMOVED` is worth review even if heuristics score it low. |
 | Need stricter CI gate | Use `hookaudit . --strict` (Day-1) — exits 1 on `WARN` as well as `CRITICAL`. |
-| Need to prove “never executes” | See `test/hookaudit.test.js` — includes `malformed JSON` and planned `never-execute marker` regression that asserts a payload marker is never created. |
+| Need to prove “never executes” | See `test/hookaudit.test.js` `never-execute` — `echo pwned > marker` after `scan` asserts `marker` does NOT exist (permanent regression). |
 
 ---
 

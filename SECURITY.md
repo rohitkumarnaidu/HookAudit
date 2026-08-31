@@ -69,17 +69,19 @@ Fatal errors are limited to: invalid root path, unreadable root.
 - `IGNORED_DIRS = {node_modules, .git, dist, build, .hookaudit}` — never bulk-walks `node_modules` (which could be huge or attacker-controlled) or `.git` objects.
 - `.git/hooks` is walked separately (only to detect committed hook scripts) and `*.sample` templates are ignored.
 
-**Reference resolution boundary** (future graph, per `RULES.md:10`):
+**Reference resolution boundary** (implemented, per `RULES.md:10`):
 
-- `../` , absolute paths, Windows drive letters, UNC paths, symlink/junction escapes outside `root` must be rejected as:
+- `../` , absolute paths, Windows drive letters, UNC paths, symlink/junction escapes outside `root` are rejected as:
   ```
-  UNRESOLVED or BOUNDARY_VIOLATION (diagnostic, not crash)
+  BOUNDARY_VIOLATION / UNRESOLVED_REFERENCE (diagnostic, not crash) — via central resolveInsideRepository(root,candidate)
   ```
-- Symlinks: MVP policy is to **not follow symlinks outside the root** (`fs.lstatSync` + `isSymbolicLink` check, preserve evidence that symlink was skipped). If a symlink target remains within root it may be followed — otherwise emit diagnostic.
-- Large files: `FILE_SKIPPED_SIZE_LIMIT` (default 1 MiB) — skip and emit diagnostic.
-- Binary blobs: `BINARY_SKIPPED` — skip.
+  Verified: `node bin/hookaudit.js` now uses `path.resolve(root,candidate)` + `path.relative` + `isAbsolute` + `\\` UNC check + case-insensitive `startsWith(root)` on Win32.
+- Symlinks: **never followed outside root** — `fs.lstatSync` + `isSymbolicLink` in both `listFilesRecursive` (discovery) and resolver; emits `SYMLINK_SKIPPED` and continues. Inside-root symlinks also skipped conservatively (MVP) with diagnostic.
+- Large files: `MAX_FILE_SIZE=1MiB` via `lstat.size` before `readFileSync` → `FILE_TOO_LARGE`.
+- Binary blobs: null-byte / non-printable heuristic → `BINARY_SKIPPED`.
+- Cycle/depth: `visited:Set`, `MAX_GRAPH_DEPTH=32` → `CYCLE_DETECTED`/`DEPTH_LIMIT_REACHED`, preserves partial graph.
 
-Boundary violations never cause outside reads.
+Boundary violations never cause outside reads; tested via `boundary traversal` and `symlink` fixtures.
 
 ## 4. Execution-Surface Model & Evidence
 
@@ -91,13 +93,14 @@ ExecutionSurface { id, sourcePath, surfaceType, triggerType, triggerCondition,
                    severity, confidence }
 ```
 
-Current `bin/hookaudit.js:321` returns `{file, surface, hash, findings, parseError}` where
-`findings[] = {trigger, command, severity, score, reasons}` — `reasons` already explain *why* in plain language, and all paths are now POSIX-normalized and deterministically sorted.
+Current `bin/hookaudit.js` returns `{file, surface, hash, findings, parseError, diagnostics, capabilities}` where
+`findings[] = {trigger, command, commandSpec{raw,executable,args,shell,references,isDynamic}, severity, score, reasons, capabilities[], reachableCapabilities[], pathRisk, confidence, evidence[], field, sourcePath}` — `reasons` explain *why*, `capabilities` are structured (`PROCESS_EXECUTION` etc.), and all paths are POSIX-normalized and deterministically sorted. Graph adds `{nodes, edges, paths}` with evidence per edge.
 
-Every meaningful edge/finding should retain evidence:
+Every meaningful edge/finding retains evidence:
 
 ```
-path, field, detector, reason, excerpt (capped at 120 chars in report)
+path, field, detector, reason, excerpt (capped at 200 chars in evidence, 120 in report)
+field pointer e.g. hooks.SessionStart[0].hooks[0].command
 ```
 
 ## 5. Capabilities & Risk
@@ -137,9 +140,9 @@ Unknown is better than invented certainty.
 
 ## 6. Baseline / Diff Integrity
 
-- Baseline is stored at `.hookaudit/baseline.json` as `{createdAt, id: randomUUID, files: {posixPath: sha256}}`.
-- Hash uses `node:crypto.createHash('sha256')` — audited primitive, not custom crypto (see `STDLIB.md:5`).
-- Diff detects `NEW`, `CHANGED`, `REMOVED` by hash comparison; future should also report structural changes (new trigger, changed command, new capability) — honest limitation until resolver/graph lands.
+- Baseline is stored at `.hookaudit/baseline.json` as `{schemaVersion:2, createdAt, id: randomUUID, files:{posixPath:sha256}, surfaces:[{file,surface,hash,capabilities,findings}], capabilitySummary, graphSummary:{nodes,edges,paths}}` — hash uses `node:crypto.createHash('sha256')` (see `STDLIB.md:5`), files still POSIX-sorted.
+- Legacy baseline `{files}` without `schemaVersion` is still readable (migration via `BASELINE_INVALID` if corrupt).
+- Diff detects `NEW/CHANGED/REMOVED` file-level plus semantic `NEW_TRIGGER/REMOVED_TRIGGER/NEW_COMMAND/NEW_CAPABILITY/REMOVED_SURFACE` via normalized trigger/command/capability comparison. Graph-aware where resolvable.
 - Baseline does **not** prove safety — it records *what you chose to trust* at a point in time.
 
 ## 7. Privacy
@@ -173,11 +176,15 @@ Never claim “Repository is completely safe” from a single tool.
 
 - [ ] `npm ls --all` → (empty)
 - [ ] `grep -c "require(" bin/hookaudit.js` → 4, all `node:` prefixed
-- [ ] No `child_process`, `vm`, `fetch`, `https` at runtime
-- [ ] `node bin/hookaudit.js scan --path test/fixtures/malicious-repo` flags CRITICAL cross-ref
-- [ ] `node bin/hookaudit.js scan --path test/fixtures/clean-repo` has 0 CRITICAL
-- [ ] Malformed JSON fixture → `parseError` diagnostic, exit 0
-- [ ] `node_modules` fixture → 0 results (never walked)
-- [ ] `npm test` → 9/9 pass (plus planned 4 new: never-execute, boundary, determinism, strict)
-- [ ] Paths in JSON are POSIX (`/`) on Windows and Linux (deterministic)
+- [ ] No `child_process`, `vm`, `fetch`, `https` at runtime (grep: 0 hits beyond test file)
+- [ ] `node bin/hookaudit.js scan --path test/fixtures/malicious-repo` flags CRITICAL cross-ref + BLOCK, `paths` shows HIGH risk
+- [ ] `node bin/hookaudit.js scan --path test/fixtures/clean-repo` has 0 CRITICAL, 2 WARN, `decision: REVIEW`
+- [ ] `node bin/hookaudit.js . --json --strict` gates WARN (exit 1) vs `hookaudit . --json` (exit 0)
+- [ ] Malformed JSON fixture → `parseError` + `INVALID_JSON` diagnostic, exit 0
+- [ ] `node_modules` fixture → 0 results (never walked via IGNORED_DIRS)
+- [ ] Large file (>1MiB) → `FILE_TOO_LARGE`, binary → `BINARY_SKIPPED`, symlink → `SYMLINK_SKIPPED`, boundary `../` → `BOUNDARY_VIOLATION` no outside read
+- [ ] Multi-hop `config → script A → script B → network` yields `NETWORK_ACCESS` path; cycle `A→B→C→A` → `CYCLE_DETECTED`; dynamic `process.env` → `DYNAMIC_EXECUTION` `LOW`
+- [ ] `npm test` → 22/22 pass (9 original + 13 safety/graph contracts)
+- [ ] Paths in JSON are POSIX (`/`) on Windows and Linux (deterministic, sorted)
+- [ ] Baseline `schemaVersion:2` present, diff shows `NEW_CAPABILITY` semantic
 

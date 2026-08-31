@@ -37,29 +37,32 @@ in CI.
 
 ## What it does
 
-`hookaudit` walks a project for eleven known auto-executing surfaces —
-Claude Code hook/MCP config, VS Code tasks/settings, Cursor rules,
-Gemini and Codex config, npm lifecycle scripts, git hooks, Husky
-hooks, and pre-commit config — and scores each discovered command
-against a small, documented rule set:
+`hookaudit` is a **repository execution-topology auditor** answering *What can this repo cause to execute, through which trigger, with which reachable capabilities, and what changed since I trusted it?* Pipeline `DISCOVER → NORMALIZE → RESOLVE → GRAPH → INFER → EXPLAIN → BASELINE → DIFF` — the graph is the central product asset.
 
-- Does it fire **automatically**, with no separate approval step
-  (`SessionStart`, `folderOpen`, `preinstall`/`postinstall`, a raw git
-  hook)?
-- Does it reach out to the **network** (`curl`, `wget`, `fetch(...)`)?
-- Does it look like it's **bootstrapping a runtime** (downloading
-  `bun`/`node`/`python`) — the exact mechanism ChainDrop used to pull
-  down Bun and run its payload?
-- Does it **cross-reference another tool's directory** — the
-  documented ChainDrop evasion trick?
-- Does it contain **obfuscation** (long base64 blobs, `eval`,
-  `Function`, `atob`)?
+It walks a project for eleven known auto-executing surfaces — Claude Code hook/MCP config, VS Code tasks/settings, Cursor rules, Gemini and Codex config, npm lifecycle scripts, git hooks, Husky hooks, and pre-commit config — and:
 
-It also supports a **baseline / diff** workflow: run `hookaudit
-baseline` once when you trust a repository's current state, then run
-`hookaudit diff` on every subsequent pull or checkout to see exactly
-what changed in any of these files — the direct, automated version of
-"check for a `.claude/settings.json` you didn't add yourself."
+1. **Normalizes** each surface to `ExecutionSurface {id, sourcePath, surfaceType, triggerType, command: CommandSpec{raw, executable, args, shell, references}, capabilities, evidence, confidence}` with field-accurate evidence (`hooks.SessionStart[0].hooks[0].command`).
+
+2. **Resolves references** statically: `config → script → script → helper` including cross-tool links, with repository boundary checks (`resolveInsideRepository`), symlink safety (`lstat`), cycle detection (`CYCLE_DETECTED`), depth limit `32` (`DEPTH_LIMIT_REACHED`), and dynamic handling (`DYNAMIC_EXECUTION`, `UNRESOLVED_REFERENCE`, `PARTIALLY_RESOLVED`) — never executing target code.
+
+3. **Materializes an execution graph**: nodes `REPOSITORY/CONFIG/TRIGGER/COMMAND/SCRIPT/FILE/PROCESS/NETWORK/CAPABILITY` and edges `CONTAINS/TRIGGERS/EXECUTES/REFERENCES/CONNECTS_TO` with evidence per edge, plus deterministic `ExecutionPath[]` showing full trigger→command→script chains.
+
+4. **Infers structured capabilities** (not just reason strings): `PROCESS_EXECUTION`, `NETWORK_ACCESS`, `REMOTE_DOWNLOAD`, `RUNTIME_BOOTSTRAP`, `ENVIRONMENT_ACCESS`, `CREDENTIAL_ACCESS_SIGNAL`, `FILE_READ/FILE_WRITE`, `OBFUSCATION`, `DYNAMIC_EXECUTION`, `CROSS_TOOL_LINK` — detectors are reusable evidence producers.
+
+5. **Scores unified path risk** (deterministic, rule-based, transparent, cross-ecosystem): `automatic + network + process → HIGH`, `automatic + remote-download + process + obfuscation → CRITICAL`, with separate `confidence` (`HIGH` literal, `MEDIUM` resolved, `LOW` dynamic). Never `MALWARE DETECTED`; outputs `HIGH-RISK EXECUTION PATH` plus `why + evidence + capabilities + confidence + recommendation`.
+
+6. **Supports trust-on-first-use baseline/diff**: `hookaudit baseline` writes `.hookaudit/baseline.json` (`schemaVersion:2`, `files:{path:sha256}`, `surfaces`, `capabilitySummary`, `graphSummary`); `hookaudit diff` reports `NEW/CHANGED/REMOVED` plus semantic `NEW_TRIGGER/CHANGED_COMMAND/NEW_CAPABILITY` and `NEW_REFERENCE` where resolvable.
+
+Safety guards: `MAX_FILE_SIZE=1MiB → FILE_TOO_LARGE`, binary heuristic → `BINARY_SKIPPED`, `lstat` symlink policy → `SYMLINK_SKIPPED`/`BOUNDARY_VIOLATION`, repository boundary helper central, visited/depth guards.
+
+Heuristic signals (still additive, now mapped to capabilities):
+- `network-fetch` → `NETWORK_ACCESS` (`curl|wget|Invoke-WebRequest|fetch("https:`)
+- `runtime-bootstrap` → `RUNTIME_BOOTSTRAP+REMOTE_DOWNLOAD` (`bun|node|python + install|download`)
+- `obfuscation` → `OBFUSCATION+DYNAMIC_EXECUTION` (200-char base64, `eval`, `new Function`, `atob`)
+- `process-exec` → `PROCESS_EXECUTION` (`node|python|bash|sh|pwsh|spawn|exec`)
+- `cross-reference` → `CROSS_TOOL_LINK` (`.claude/` vs `.vscode/` etc.)
+- `remote-download` → `REMOTE_DOWNLOAD+NETWORK_ACCESS` (`curl … | bash`)
+- `env-access` → `ENVIRONMENT_ACCESS`, `credential-signal` → `CREDENTIAL_ACCESS_SIGNAL`
 
 ## Build
 
@@ -121,18 +124,15 @@ flagged CRITICAL on both files.
 npm test
 ```
 
-9 tests in `test/hookaudit.test.js` (Day-1 hardening adds 4 planned:
-never-execute, boundary traversal, determinism, strict mode — see
-`INVESTIGATION_REPORT.md`), run as black-box subprocess tests
-against the actual CLI (via `node:test` + `node:child_process`):
-clean-repo has no CRITICAL findings; the malicious-pattern fixture
-does; the cross-reference rule fires; the runtime-bootstrap rule
-fires; obfuscation is flagged; baseline/diff correctly reports no
-drift on an unchanged repo and correctly reports `CHANGED` when a
-tracked file is modified; malformed JSON is reported as a parse error
-rather than crashing the scanner; `node_modules` is never walked.
-Output is POSIX-normalized and deterministically sorted so Windows
-and Linux produce byte-identical JSON.
+22 tests in `test/hookaudit.test.js`, run as black-box subprocess tests via `node:test` + `node:child_process` against the actual CLI:
+
+- clean-repo has no CRITICAL (exit 0), malicious-pattern is CRITICAL (exit 1), cross-reference and runtime-bootstrap fire, obfuscation flagged, `node_modules` never walked, malformed JSON → `parseError` diagnostic not crash
+- baseline/diff: no drift on unchanged, `CHANGED` on modified, `NEW_CAPABILITY` semantic diff (`NETWORK_ACCESS` after `curl` edit)
+- **Safety:** never-execute marker never created, boundary `../` and absolute outside → `BOUNDARY_VIOLATION` no outside read, `FILE_TOO_LARGE` (>1MiB) and `BINARY_SKIPPED` (null-byte) guards, `SYMLINK_SKIPPED` on symlink outside, `PERMISSION_DENIED` handling
+- **Graph:** multi-hop `config → script A → script B → network` yields connected path with `NETWORK_ACCESS`, cycle `A→B→C→A` → `CYCLE_DETECTED` and terminates, dynamic `process.env` → `DYNAMIC_EXECUTION` `LOW` confidence, depth limit `32`
+- **Contracts:** determinism `scan#1 === scan#2` on same repo (POSIX, sorted), strict mode `hookaudit . --strict` gates `WARN`, positional `hookaudit .` ≡ `hookaudit scan --path`, human report prioritizes high-risk paths, JSON `v1` with `summary/paths/graph/diagnostics` plus backward-compat `results/diff`
+
+All output is POSIX-normalized and deterministically sorted (Windows/Linux byte-identical JSON). Graphs are deterministic (`nodes/edges/paths` sorted).
 
 See `SECURITY.md` and `LIMITATIONS.md` for the full threat model and
 honest limitation disclosure.
@@ -163,35 +163,12 @@ honest limitation disclosure.
 
 ## Limitations (said plainly, per the hackathon's honesty rule)
 
-- **Working tree only, not all branches.** The rules explicitly
-  disallow shelling out to the `git` binary as a hidden runtime
-  dependency, so we do not invoke `git`. ChainDrop-style attacks
-  specifically targeted branches other than `main`. A "should have"
-  feature (not in this build) is a git-native branch walker: read
-  `.git/refs/heads/*` and `.git/packed-refs` directly, then inflate
-  loose objects via `node:zlib` to read each branch's tree without
-  ever running `git` — legal under the rules because it only reads
-  `.git`'s on-disk format, using the stdlib, and never invokes an
-  external binary.
-- **No TOML/YAML structural parsing.** `.codex/config.toml` and
-  `.pre-commit-config.yaml` are scanned as raw text with the same rule
-  engine as everything else, not structurally parsed. Node's stdlib
-  has no TOML or YAML reader (confirmed against the hackathon's own
-  cheat-sheet), and a correct hand-rolled parser for either was out of
-  scope for this build. This means a hook hidden inside an unusual
-  TOML multiline-string layout could be missed by field-level
-  extraction, though the whole-file text sweep still runs on it.
-- **Heuristic, not exhaustive.** This is a tripwire, not a guarantee.
-  A sufficiently patient attacker who avoids every one of our five
-  signals (no network call, no runtime download, no cross-reference,
-  no obfuscation, and accepts the WARN-level "it auto-fires" flag
-  alone) would not be scored CRITICAL. The baseline/diff workflow is
-  the real safety net: *any* change to a tracked hook file is
-  reported regardless of whether the heuristics score it as
-  dangerous.
-- **Not a sandbox.** `hookaudit` reads files; it never executes a
-  discovered hook to observe its behavior. That's intentional — a
-  static scanner should not run the thing it's inspecting.
+- **Working tree only, not all branches.** We do not invoke `git` (hidden runtime dep forbidden). ChainDrop targeted branches other than `main`. A stretch is a git-native walker reading `.git/refs/heads/*` + `.git/packed-refs` via `node:zlib` — not in this build.
+- **No TOML/YAML structural parsing.** `.codex/config.toml` and `.pre-commit-config.yaml` are raw-text heuristic scans, not TOML/YAML ASTs (Node has no stdlib TOML/YAML reader). A hook hidden in unusual multiline-string layout could be missed by field extraction, though whole-file sweep still catches blunt `curl`/`eval`.
+- **No full shell/language AST.** Commands are `CommandSpec{raw, executable, args, shell, references}` via light tokenization, not a full shell parser. Variable-constructed paths like `process.env.X + "/setup.sh"` correctly become `DYNAMIC_EXECUTION`/`UNRESOLVED_REFERENCE` `LOW` confidence rather than guessed.
+- **Graph is bounded static analysis.** Resolver follows `config → script → script` with `MAX_GRAPH_DEPTH=32`, cycle and boundary guards, and `lstat` symlink checks. It never executes, never builds a full interpreter, and reports `DYNAMIC_EXECUTION`/`UNRESOLVED_REFERENCE`/`CYCLE_DETECTED`/`DEPTH_LIMIT_REACHED` where static interpretation is incomplete. A chain that dynamically constructs its next hop at runtime will be `LOW` confidence.
+- **Heuristic, not exhaustive.** Tripwire requiring specific signals. An attacker avoiding all signals (no network, no runtime download, no cross-reference, no obfuscation, accepting `WARN` auto-trigger alone) would not be `CRITICAL`. Baseline/diff is the real safety net: *any* change to a tracked file is `CHANGED`/`NEW`/`REMOVED` plus `NEW_CAPABILITY` where detectable.
+- **Not a sandbox.** Reads files only; never executes hooks. `hookaudit diff` on every pull/checkout is the workflow: any new trigger/command/capability is worth review even if heuristics score low.
 
 ## Threat model
 

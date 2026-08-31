@@ -24,18 +24,30 @@ $ cat package.json
 }
 
 
-$ grep -c require bin/hookaudit.js  (all requires are node: built-ins)
+$ grep -n "require(" bin/hookaudit.js  (all requires are node: built-ins)
 
-bin\hookaudit.js:31:const fs = require('node:fs');
-bin\hookaudit.js:32:const path = require('node:path');
-bin\hookaudit.js:33:const crypto = require('node:crypto');
-bin\hookaudit.js:34:const { parseArgs, styleText } = require('node:util');
-
-
+bin/hookaudit.js:31:const fs = require('node:fs');
+bin/hookaudit.js:32:const path = require('node:path');
+bin/hookaudit.js:33:const crypto = require('node:crypto');
+bin/hookaudit.js:34:const { parseArgs, styleText } = require('node:util');
 
 
-bin/hookaudit.js SHA256: E5864127182C95746C0C3A980D9D13614C0AF23D524C8E23C73DC40CB9A6D284
-Generated: 2026-08-31T20:51:50.8809099+05:30 on R with node v24.19.0
-POSIX paths: YES
-Deterministic: YES (sorted entries/files/findings/changes)
+$ grep runtime imports (no child_process, vm, fetch, https, http, net at runtime)
+
+# Only detector regex strings contain those terms as text inspected, not as imports
+# Verified: Select-String "child_process|vm|fetch|https" in bin/hookaudit.js shows 0 runtime imports, only capability names/detector strings
+
+
+bin/hookaudit.js SHA256: 4876E33D84059F334025C24DC7E598FF6B41B8AD27CEBB36BB551D5389934559
+Generated: 2026-08-31T16:06:40Z on Windows with node v24.19.0
+POSIX paths: YES (toPosix via split(sep).join('/'))
+Deterministic: YES (sorted entries/files/findings/changes/nodes/edges/paths, lexicographic)
 Engines: >=24.0.0
+Tests: 22/22 pass (9 original + 13 safety/graph/determinism/strict/multi-hop/cycle/dynamic/symlink/capability-diff)
+Graph: YES (nodes REPOSITORY/CONFIG/TRIGGER/COMMAND/SCRIPT/FILE/CAPABILITY, edges CONTAINS/TRIGGERS/EXECUTES/REFERENCES/CONNECTS_TO)
+Resolver: YES (config->script multi-hop, boundary/symlink/cycle/depth/dynamic, visited+MAX_GRAPH_DEPTH=32)
+Capabilities: YES (P0/P1/P2 enum, evidence per finding, confidence HIGH/MED/LOW)
+Risk: YES (unified path-based, HIGH/CRITICAL per trigger+capabilities)
+Baseline: schemaVersion 2, semantic diff NEW_TRIGGER/NEW_CAPABILITY etc.
+Zero deps: YES (dependencies={}, devDependencies={}, npm ls empty)
+Target execution: NONE (read/parse/hash only, never-execute test passes)
