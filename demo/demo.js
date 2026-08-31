@@ -175,9 +175,11 @@
   let baselineRecord = null; // {schemaVersion, files, surfaces, ...}
   let diffResult = null;
   let analysis = null; // last analysis result
-  // P2: evidence explorer filter state
+  // P2: evidence explorer filter state + paging
   let evidenceRawRows = [];
   let evidenceFilters = { q: '', detector: 'all', confidence: 'all', file: 'all' };
+  let evidencePage = 0;
+  const EVIDENCE_PAGE_SIZE = 10;
 
   function getFixture(id) { return FIXTURES.find(function (f) { return f.id === id; }); }
   function cloneFiles(map) { const out = {}; Object.keys(map).forEach(function (k) { out[k] = map[k]; }); return out; }
@@ -334,18 +336,12 @@
 
   function renderSummary() {
     if (!analysis) return;
-    document.getElementById('stat-surfaces').textContent = String(analysis.summary.executionSurfaces);
-    document.getElementById('stat-findings').textContent = String(analysis.summary.withFindings);
-    document.getElementById('stat-high').textContent = String(analysis.summary.highRiskPaths);
-    const dEl = document.getElementById('stat-decision');
-    dEl.textContent = analysis.summary.decision;
-    dEl.className = 'decision decision--' + analysis.summary.decision.toLowerCase();
-    const g = document.getElementById('graph-summary');
-    const n = analysis.graph.nodes.length;
-    const e = analysis.graph.edges.length;
-    const p = analysis.graph.paths.length;
-    g.textContent = n + ' nodes · ' + e + ' edges · ' + p + ' path(s)';
-    document.getElementById('paths-count').textContent = p + ' path(s)';
+    const s1 = document.getElementById('stat-surfaces'); if(s1) s1.textContent = String(analysis.summary.executionSurfaces);
+    const s2 = document.getElementById('stat-findings'); if(s2) s2.textContent = String(analysis.summary.withFindings);
+    const s3 = document.getElementById('stat-high'); if(s3) s3.textContent = String(analysis.summary.highRiskPaths);
+    const s4 = document.getElementById('stat-caps'); if(s4) s4.textContent = String([...new Set(analysis.results.flatMap(function(r){return r.capabilities||[]}))].length);
+    const dEl = document.getElementById('stat-decision'); if(dEl){ dEl.textContent = analysis.summary.decision; dEl.className = 'decision decision--' + analysis.summary.decision.toLowerCase(); }
+    const g = document.getElementById('graph-summary'); if(g){ const n = analysis.graph.nodes.length; const e = analysis.graph.edges.length; const p = analysis.graph.paths.length; g.textContent = n + ' nodes · ' + e + ' edges · ' + p + ' path(s)'; const pc=document.getElementById('paths-count'); if(pc) pc.textContent = p + ' path(s)'; }
   }
 
   function riskBadgeClass(risk) {
@@ -530,12 +526,30 @@
     // populate filter dropdowns (once per render, preserve selection if still valid)
     populateEvidenceFilters(uniq);
 
-    // apply filters
+    // apply filters + paging (10 per page)
     const filtered = getFilteredEvidenceRows(uniq);
-    count.textContent = filtered.length + ' / ' + uniq.length + ' evidence row(s)' + (filtered.length !== uniq.length ? ' (filtered)' : '');
+    const total = filtered.length;
+    const pages = Math.max(1, Math.ceil(total / EVIDENCE_PAGE_SIZE));
+    if (evidencePage >= pages) evidencePage = pages - 1;
+    if (evidencePage < 0) evidencePage = 0;
+    const pageSlice = filtered.slice(evidencePage * EVIDENCE_PAGE_SIZE, (evidencePage + 1) * EVIDENCE_PAGE_SIZE);
+    count.textContent = (total ? (evidencePage * EVIDENCE_PAGE_SIZE + 1) + '–' + Math.min((evidencePage + 1) * EVIDENCE_PAGE_SIZE, total) + ' of ' : '') + total + ' / ' + uniq.length + ' evidence row(s)' + (filtered.length !== uniq.length ? ' (filtered)' : '') + (pages > 1 ? ' — page ' + (evidencePage + 1) + '/' + pages : '');
+    // render pager
+    const pager = document.getElementById('evidence-pager');
+    if (pager) {
+      pager.innerHTML = '';
+      if (pages > 1) {
+        const prev = el('button', 'btn btn--sm' + (evidencePage===0?'':'') , '◀ Prev');
+        prev.disabled = evidencePage===0; prev.addEventListener('click', function(){ evidencePage--; renderEvidence(); });
+        const info = el('span', 'pager-info', 'Page ' + (evidencePage+1) + ' of ' + pages);
+        const next = el('button', 'btn btn--sm', 'Next ▶');
+        next.disabled = evidencePage >= pages-1; next.addEventListener('click', function(){ evidencePage++; renderEvidence(); });
+        pager.appendChild(prev); pager.appendChild(info); pager.appendChild(next);
+      } else if (pager) pager.textContent = total ? 'Showing ' + total + ' row(s)' : '';
+    }
     if (traceEl) {
-      if (filtered.length !== uniq.length) traceEl.textContent = filtered.length + ' rows match filters — ' + (uniq.length - filtered.length) + ' hidden. Click a row to trace its source file.';
-      else traceEl.textContent = 'Click a row to highlight its source file in the file exhibit. All rows are evidence-backed.';
+      if (filtered.length !== uniq.length) traceEl.textContent = filtered.length + ' rows match filters — ' + (uniq.length - filtered.length) + ' hidden. Click a row to trace its source file. (Page ' + (evidencePage+1) + '/' + pages + ')';
+      else traceEl.textContent = 'Click a row to highlight its source file in the file exhibit. All rows are evidence-backed. Showing page ' + (evidencePage+1) + '/' + pages + '.';
       traceEl.className = 'evidence-trace' + (filtered.length !== uniq.length ? ' is-active' : '');
     }
     if (!uniq.length) {
@@ -556,9 +570,12 @@
       td.style.textAlign = 'center';
       td.style.padding = '18px';
       tr.appendChild(td); tbody.appendChild(tr);
+      // clear pager if no results
+      const pg = document.getElementById('evidence-pager');
+      if (pg) pg.innerHTML = '<span class="pager-info">No results</span>';
       return;
     }
-    filtered.forEach(function (r) {
+    pageSlice.forEach(function (r) {
       const tr = document.createElement('tr');
       tr.tabIndex = 0;
       tr.setAttribute('role', 'button');
@@ -649,9 +666,97 @@
   }
 
   function rerenderEvidenceFiltered() {
-    // re-render tbody only, without re-populating filters logic duplication — just call renderEvidence
-    // but to avoid re-populating and losing scroll, we call renderEvidence which will re-use current filter state
+    evidencePage = 0;
     renderEvidence();
+  }
+
+  function renderSurfaceExplorer() {
+    const container = document.getElementById('surface-explorer');
+    const countEl = document.getElementById('surfaces-count');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!analysis || !analysis.results) { if (countEl) countEl.textContent = '—'; container.appendChild(el('div','empty','No scan yet — select a fixture.')); return; }
+    const groups = {};
+    analysis.results.forEach(function (r) {
+      const eco = r.surface || 'unknown';
+      if (!groups[eco]) groups[eco] = [];
+      groups[eco].push(r);
+    });
+    const ecoLabels = { 'claude-settings':'Claude Code', 'claude-mcp':'Claude MCP', 'vscode-tasks':'VS Code', 'vscode-settings':'VS Code Settings', 'cursor-rules':'Cursor', 'gemini-settings':'Gemini', 'codex-config':'Codex', 'package-lifecycle':'npm', 'husky-hooks':'Husky', 'git-hooks':'Git hooks', 'precommit-config':'pre-commit', 'github-workflows':'GitHub Actions' };
+    if (countEl) countEl.textContent = analysis.results.length + ' surface(s)';
+    const sortedEcos = Object.keys(groups).sort();
+    if (!sortedEcos.length) { container.appendChild(el('div','empty','No execution surfaces detected.')); return; }
+    sortedEcos.forEach(function (eco) {
+      const group = el('div','surface-group');
+      const head = el('div','surface-group-head');
+      head.appendChild(document.createTextNode(ecoLabels[eco] || eco));
+      head.appendChild(el('span','micro', groups[eco].length + ' file(s)'));
+      group.appendChild(head);
+      groups[eco].forEach(function (r) {
+        const item = el('div','surface-item'); item.tabIndex = 0; item.setAttribute('role','button');
+        const sev = r.findings[0]?.severity || 'INFO';
+        const risk = r.findings[0]?.pathRisk || sev;
+        const left = el('div'); left.appendChild(el('div','s-path', r.file)); left.appendChild(el('div','micro', (r.findings[0]?.trigger||'—') + ' · ' + (r.findings[0]?.confidence||'HIGH')));
+        const right = el('div','s-meta'); const badge = el('span','badge ' + (risk==='CRITICAL'?'badge--critical':risk==='HIGH'?'badge--high':risk==='MEDIUM'?'badge--medium':'badge--low'), risk); right.appendChild(badge);
+        item.appendChild(left); item.appendChild(right);
+        function select(){ selectedFile = r.file; renderFileExhibit(); renderFileContent(); document.getElementById('files-heading')?.scrollIntoView({behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth', block:'center'}); }
+        item.addEventListener('click', select);
+        item.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); select(); } });
+        group.appendChild(item);
+      });
+      container.appendChild(group);
+    });
+  }
+
+  function renderZeroDepPanel() {
+    const elDeps = document.getElementById('deps-count');
+    const snippet = document.getElementById('deps-proof-snippet');
+    if (elDeps) elDeps.textContent = '0';
+    if (snippet) {
+      snippet.textContent = 'package.json dependencies: {} / devDependencies: {} → npm ls --all → (empty)\nbin/hookaudit.js → node:fs, node:path, node:crypto, node:util, node:zlib only\nTarget code never executed (read/parse/hash only, never-execute marker test)\nBrowser demo: file:// compatible, no server, no upload, inert fixtures';
+    }
+    const branchEl = document.getElementById('branch-panel');
+    if (branchEl) branchEl.textContent = 'CLI: node bin/hookaudit.js branches --json\nCompares local branches via .git/HEAD, refs/heads, packed-refs + node:zlib (no git binary). Detects NEW/CHANGED + NEW_CAPABILITY across committed trees. .git/hooks is local state, not compared.';
+  }
+
+  function setupExports() {
+    function downloadBlob(content, mime, filename) {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 500);
+      const status = document.getElementById('export-status');
+      if (status) { status.textContent = 'Downloaded ' + filename + ' (' + Math.round(blob.size/1024) + ' KB)'; setTimeout(function(){ status.textContent=''; }, 4000); }
+    }
+    const btnJson = document.getElementById('btn-export-json');
+    const btnSarif = document.getElementById('btn-export-sarif');
+    const btnHtml = document.getElementById('btn-export-html');
+    if (btnJson) btnJson.addEventListener('click', function(){
+      if (!analysis) return;
+      const payload = { version:1, repository:{ path: currentFixture?currentFixture.id:'demo' }, summary: analysis.summary, results: analysis.results, graph: analysis.graph, capabilities: [...new Set(analysis.results.flatMap(r=>r.capabilities||[]))].sort(), diagnostics: analysis.diagnostics };
+      downloadBlob(JSON.stringify(payload,null,2), 'application/json', 'hookaudit-report.json');
+    });
+    if (btnSarif) btnSarif.addEventListener('click', function(){
+      if (!analysis) return;
+      // Minimal SARIF via browser engine (same rule IDs as CLI)
+      const results = analysis.results;
+      const allFindings = results.flatMap(function(r){return r.findings});
+      const rulesMap = {}; allFindings.forEach(function(f){ (f.capabilities||['EXECUTION_SURFACE']).forEach(function(c){ rulesMap['HOOKAUDIT.'+c]=c; }); });
+      const rules = Object.keys(rulesMap).sort().map(function(id){ return {id, name:rulesMap[id]}; });
+      if(!rules.length) rules.push({id:'HOOKAUDIT.NO_FINDING', name:'NO_FINDING'});
+      const sarifResults = [];
+      results.forEach(function(r){ r.findings.forEach(function(f){ (f.capabilities&&f.capabilities.length?f.capabilities:['EXECUTION_SURFACE']).forEach(function(cap){ sarifResults.push({ruleId:'HOOKAUDIT.'+cap, level: f.severity==='CRITICAL'?'error':f.severity==='WARN'?'warning':'note', message:{text:'['+f.severity+'] '+f.trigger+' — '+f.reasons.slice(0,1).join('; ')}, locations:[{physicalLocation:{artifactLocation:{uri:r.file}, region:{startLine:1}}}]}); }); }); });
+      const sarif = { $schema:'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json', version:'2.1.0', runs:[{tool:{driver:{name:'hookaudit', rules}}, results:sarifResults}] };
+      downloadBlob(JSON.stringify(sarif,null,2), 'application/json', 'hookaudit.sarif');
+    });
+    if (btnHtml) btnHtml.addEventListener('click', function(){
+      if (!analysis) return;
+      const html = '<!DOCTYPE html><html><head><meta charset=&quot;utf-8&quot;><title>HookAudit Report — ' + (currentFixture?currentFixture.id:'demo') + '</title><style>body{font-family:sans-serif; padding:24px; background:#080c14; color:#e2e8f0}</style></head><body><h1>HookAudit Report — ' + (currentFixture?currentFixture.id:'demo') + '</h1><pre>' + JSON.stringify(analysis.summary,null,2).replace(/</g,'&lt;') + '</pre><p>Full HTML export via CLI: node bin/hookaudit.js --html report.html</p></body></html>';
+      downloadBlob(html, 'text/html', 'hookaudit-report.html');
+    });
+    // Header reset
+    const hdrReset = document.getElementById('btn-reset-header');
+    if (hdrReset) hdrReset.addEventListener('click', function(){ const btn=document.getElementById('btn-reset'); if(btn) btn.click(); });
   }
 
   function renderDiagnostics() {
@@ -746,6 +851,7 @@
     renderFileExhibit();
     renderFileContent();
     reanalyze();
+    renderSurfaceExplorer();
     renderSummary();
     renderPaths();
     renderCapabilities();
@@ -754,13 +860,13 @@
     renderDiagnostics();
     renderTerminal();
     renderBaseline();
+    renderZeroDepPanel();
     // P2: thin dashboard + interactive graph (derived from live analysis.graph)
     if (window.HookAuditDashboard) {
       try {
         window.HookAuditDashboard.renderDashboard('dashboard-metrics', analysis, diffResult);
         window.HookAuditDashboard.renderGraph('graph-interactive', analysis.graph, analysis);
       } catch (e) {
-        // fail soft — keep demo usable even if graph throws
         console.error('P2 viz error', e);
       }
     }
@@ -900,6 +1006,22 @@
   }
 
   function attachEvents() {
+    setupExports();
+    // Graph filter chips (All/High/Network/Process/Unresolved) — wire to dashboard if available
+    document.querySelectorAll('.chip[data-filter]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.querySelectorAll('.chip[data-filter]').forEach(function(b){ b.classList.remove('is-active'); });
+        btn.classList.add('is-active');
+        const f = btn.getAttribute('data-filter');
+        if (window.HookAuditDashboard && typeof window.HookAuditDashboard.filterGraph === 'function') {
+          try { window.HookAuditDashboard.filterGraph(f); } catch(e){}
+        } else if (window.HookAuditDashboard && typeof window.HookAuditDashboard.renderGraph === 'function' && analysis && analysis.graph) {
+          // fallback: re-render graph with filter param stored globally
+          window._hookAuditGraphFilter = f;
+          try { window.HookAuditDashboard.renderGraph('graph-interactive', analysis.graph, analysis); } catch(e){}
+        }
+      });
+    });
     document.getElementById('btn-baseline').addEventListener('click', handleBaseline);
     document.getElementById('btn-change').addEventListener('click', handleChange);
     document.getElementById('btn-diff').addEventListener('click', handleDiff);
