@@ -685,6 +685,8 @@ function resolveExecutionGraph(root, scanResults, globalDiagnostics) {
       let createdPathsForFinding = 0;
 
       for (const rawRef of allRefs) {
+        if (!rawRef || rawRef.length < 3 || rawRef === '//' || rawRef.startsWith('http') || rawRef.startsWith('//')) continue;
+        if (!/[\/\\]/.test(rawRef) && !/\.\w+$/.test(rawRef)) continue;
         const resolved = resolveInsideRepository(root, rawRef);
         if (!resolved.ok) {
           if (resolved.code === DIAGNOSTIC_CODES.BOUNDARY_VIOLATION) {
@@ -782,6 +784,8 @@ function resolveExecutionGraph(root, scanResults, globalDiagnostics) {
           }
           const curRefs = extractScriptReferences(cur.content);
           for (const nr of curRefs) {
+            if (!nr || nr.length < 3 || nr === '//' || nr.startsWith('http') || nr.startsWith('//')) continue;
+            if (!/[\/\\]/.test(nr) && !/\.\w+$/.test(nr)) continue;
             // Resolve relative to cur file's directory, not root
             const baseDir = path.dirname(cur.abs);
             let nrResolved;

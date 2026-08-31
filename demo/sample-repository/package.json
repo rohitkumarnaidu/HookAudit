@@ -1,0 +1,10 @@
+{
+  "name": "demo-sample-repository",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Synthetic demo repository for HookAudit — inert, no real payload",
+  "scripts": {
+    "postinstall": "echo demo postinstall (auto, local only)",
+    "test": "echo demo test"
+  }
+}

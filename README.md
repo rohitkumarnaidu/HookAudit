@@ -7,6 +7,14 @@ commands the moment you open a repository or install its dependencies.
 Track: **E — Security & Crypto Utilities** ("local security scanner" /
 "file integrity tooling").
 
+## One-line pitch
+
+HookAudit is a **zero-dependency local repository execution-topology auditor** — it discovers repository-controlled execution surfaces across AI-agent, IDE/workspace, package-lifecycle, and development-hook systems, resolves multi-hop execution paths, maps reachable capabilities, explains contextual risk with evidence, and detects execution-surface changes against a trusted baseline.
+
+## Solution
+
+Static, offline, trust-on-first-use scanner that turns the manual `open .claude/settings.json + .vscode/tasks.json and look` workflow into a one-command `hookaudit .` plus `hookaudit baseline/diff` for every pull — with an explicit execution graph as the central artifact.
+
 ## The problem
 
 On August 4, 2026, the ChainDrop worm compromised the maintainer
@@ -86,7 +94,123 @@ Requires Node.js ≥ 24.0.0 (tested on v24.19.0 LTS; Node 20 reached EOL
 itself only needs `node:fs`, `node:path`, `node:crypto`, `node:util`,
 all stable since Node 14–18.
 
-## Run
+## Installation
+
+Same as Build — no `npm install` of runtime dependencies required. From a clean checkout:
+
+```bash
+git clone https://github.com/rohitkumarnaidu/HookAudit.git
+cd HookAudit
+node bin/hookaudit.js --help   # one-command run, no build
+# or
+make           # one-command build/run via Makefile (see Makefile)
+# or
+npm test       # runs 22 tests, zero deps
+```
+
+## Architecture
+
+```
+Repository
+  → Boundary (resolveInsideRepository + lstat + MAX_FILE_SIZE + visited/MAX_GRAPH_DEPTH)
+  → Surface Discovery (SURFACES[11] × resolveSurfaceFiles, IGNORED_DIRS, sorted)
+  → Adapters (Claude/VS Code/Cursor/npm/Husky+git/Gemini/Codex → ExecutionSurface + Evidence)
+  → Trigger + CommandSpec{raw, executable, args, shell, references, isDynamic}
+  → Reference Resolver (config → script → script, cross-tool, cycle/depth/boundary/dynamic, BFS queue)
+  → Execution Graph (nodes REPOSITORY/CONFIG/TRIGGER/COMMAND/SCRIPT/FILE/CAPABILITY, edges CONTAINS/TRIGGERS/EXECUTES/REFERENCES/CONNECTS_TO)
+  → Capability Engine (P0/P1/P2, detector → capability + evidence)
+  → Path-Based Risk (unified, deterministic, HIGH/CRITICAL + confidence HIGH/MED/LOW)
+  → Human + JSON v1 + Baseline/Diff
+```
+
+Adapters never own risk; detectors never become graph. Single file `bin/hookaudit.js` (1271 lines, frozen core).
+
+## Supported ecosystems
+
+| Ecosystem | Path | Trigger | Execution | Status |
+|---|---|---|---|---|
+| Claude Code | `.claude/settings.json`, `.claude/settings.local.json` | `SessionStart, PreToolUse, PostToolUse, UserPromptSubmit` | `hooks.*[].command` | ✅ structured |
+| Claude MCP | `.mcp.json`, `.claude/mcp.json` | `mcp:server` auto | `command + args` | ✅ structured |
+| VS Code | `.vscode/tasks.json` | `runOn: folderOpen` auto | `command + args` | ✅ structured |
+| VS Code | `.vscode/settings.json` | heuristic | text sweep | heuristic |
+| Cursor | `.cursorrules`, `.cursor/rules` | instruction vs hook (only documented hooks) | text | heuristic |
+| Gemini | `.gemini/settings.json` | `settings` | JSON sweep | heuristic |
+| Codex | `.codex/config.toml` | heuristic | raw text (no TOML AST) | heuristic |
+| npm | `package.json` | `preinstall/install/postinstall/prepare/prepublish` auto | `scripts.*` | ✅ structured |
+| Husky | `.husky/*` | git hook auto | text-dir | heuristic |
+| Git hooks | `.git/hooks/*` (excl `*.sample`) | git hook auto | text-dir | heuristic |
+| pre-commit | `.pre-commit-config.yaml` | heuristic | raw text (no YAML AST) | heuristic |
+
+11 surfaces; do not add ecosystems before graph is stable (RULES §6).
+
+## Execution graph
+
+Materialized `ExecutionPath[]` from resolver trace:
+
+```
+.claude/settings.json --TRIGGERS→ SessionStart --EXECUTES→ node scripts/bootstrap.mjs --REFERENCES→ scripts/helper.sh --CONNECTS_TO→ NETWORK
+```
+
+Nodes `REPOSITORY/CONFIG/TRIGGER/COMMAND/SCRIPT/FILE/CAPABILITY`, edges `CONTAINS/TRIGGERS/EXECUTES/REFERENCES/CONNECTS_TO` with evidence per edge. See `demo/sample-repository` for live multi-hop.
+
+## Capabilities
+
+P0 `PROCESS_EXECUTION, NETWORK_ACCESS, REMOTE_DOWNLOAD` · P1 `RUNTIME_BOOTSTRAP, ENVIRONMENT_ACCESS, CREDENTIAL_ACCESS_SIGNAL` · P1/P2 `FILE_READ, FILE_WRITE, OBFUSCATION, DYNAMIC_EXECUTION, CROSS_TOOL_LINK`. Detectors `RULES[]` → capability IDs + `evidence{path,field,detector,reason,excerpt}` + `confidence`.
+
+## Risk
+
+Unified, deterministic, rule-based, transparent, cross-ecosystem (adapters do not score). Based on `trigger context + execution path + reachable capabilities + confidence`:
+
+- `manual + local formatting → LOW`
+- `automatic + local → MEDIUM` (e.g., `postinstall echo`)
+- `automatic + network + process → HIGH`
+- `automatic + remote-download + process + obfuscation → CRITICAL`
+
+Separate `risk` vs `confidence` (`HIGH` literal, `MEDIUM` resolved, `LOW` dynamic). Never `MALWARE DETECTED`; use `HIGH-RISK EXECUTION PATH` + `why/evidence/capabilities/confidence`.
+
+## Example
+
+```bash
+# Scan demo (shows SessionStart → bootstrap.mjs → helper.sh → NETWORK)
+node bin/hookaudit.js scan --path demo/sample-repository --json | jq .summary
+# → {"executionSurfaces":3,"critical":1,"highRiskPaths":3,"decision":"BLOCK"}
+node bin/hookaudit.js scan --path demo/sample-repository
+# → High-risk execution paths: CRITICAL SessionStart → bootstrap.mjs → helper.sh (RUNTIME_BOOTSTRAP, REMOTE_DOWNLOAD)
+```
+
+## Zero dependency
+
+`package.json: dependencies:{} devDependencies:{}` `npm ls --all → (empty)` `bin/hookaudit.js` only `node:fs, node:path, node:crypto, node:util` (see `STDLIB.md` 12 substitutions + `deps-proof.txt` `0AD6C16F`). No `child_process` at runtime, no network, no vendoring.
+
+## Security model
+
+Target is inert data (`read/parse/hash` only, never `spawn/eval/require(target)`). Proven via `never-execute` regression (`marker not exists`) and `grep` no `child_process` at runtime. Boundary via `resolveInsideRepository` + `lstat` + `visited/32` + `DYNAMIC_EXECUTION` handling. See `SECURITY.md` for full threat model (in-scope: cloned repo before opening in agent; out-of-scope: compromised `node`/OS, package code vs hook config).
+
+## Demo
+
+Deterministic synthetic fixture `demo/sample-repository` (no real malware, `example-attacker.test` reserved):
+
+```
+demo/sample-repository/
+├── .claude/settings.json      # SessionStart → node scripts/bootstrap.mjs
+├── .vscode/tasks.json         # folderOpen → bash scripts/helper.sh --cross .claude/settings.json
+├── scripts/bootstrap.mjs      # → helper.sh + https://example-attacker.test (NETWORK)
+├── scripts/helper.sh          # curl … | bash --download bun-runtime (REMOTE_DOWNLOAD+RUNTIME_BOOTSTRAP)
+└── package.json               # postinstall echo (local)
+```
+
+5-minute flow: `Problem (0:00) → Surface (0:30) → hookaudit . (1:15) → Risk WHAT/WHEN/PATH/CAPABILITY/WHY (2:15) → baseline → change → diff NEW_CAPABILITY (3:15) → zero-dep (4:15)`. Baseline/diff demo:
+
+```bash
+node bin/hookaudit.js baseline --path demo/sample-repository
+# edit helper.sh (add/remove curl line)
+node bin/hookaudit.js diff --json --path demo/sample-repository | jq .diff.semantic
+# → NEW_CAPABILITY NETWORK_ACCESS
+```
+
+See `demo/README.md` for reliability (`run 3× stable, no internet`).
+
+## CLI
 
 ```
 hookaudit .                          # scan current directory (human)
@@ -102,7 +226,7 @@ for cross-platform reproducible output.
 
 Exit codes: `0` = no policy violation; `1` = CRITICAL (or WARN with
 `--strict`) or drift was detected — safe to use as a CI gate or a
-pre-`git pull` hook; `2` = usage / path error.
+pre-`git pull` hook; `2` = usage / path error; `3` = internal failure (reserved, clean handling).
 
 ### Try it on the included fixtures
 
@@ -118,7 +242,18 @@ a `SessionStart` hook in `.claude/settings.json` pointing into
 back into `.claude/`, downloading a runtime over the network. It's
 flagged CRITICAL on both files.
 
-## Tests
+## Baseline/diff
+
+`hookaudit baseline` writes `.hookaudit/baseline.json` (`schemaVersion:2`, `files:{path:sha256}`, `surfaces`, `capabilitySummary`, `graphSummary`). `hookaudit diff` reports `NEW/CHANGED/REMOVED` file-level plus semantic `NEW_TRIGGER/CHANGED_COMMAND/NEW_CAPABILITY` (normalized execution behavior, not full program equivalence). Strict policy `LOW allow, MEDIUM warn, HIGH/CRITICAL fail`. Baseline does not prove safety — it records what you chose to trust.
+
+```bash
+node bin/hookaudit.js baseline --path demo/sample-repository
+# make controlled change (e.g., edit scripts/helper.sh to add curl line)
+node bin/hookaudit.js diff --json --path demo/sample-repository | jq .diff.semantic
+# → NEW_CAPABILITY NETWORK_ACCESS
+```
+
+## Testing
 
 ```
 npm test
