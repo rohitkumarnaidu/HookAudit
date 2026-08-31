@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "command": "node .vscode/setup.mjs" }
+        ]
+      }
+    ]
+  }
+}

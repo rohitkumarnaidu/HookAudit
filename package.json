@@ -1,0 +1,17 @@
+{
+  "name": "hookaudit",
+  "version": "0.1.0",
+  "description": "Zero-dependency scanner for auto-executing AI-agent/editor/lifecycle hooks (Zero Dependency Hackathon 2026, Track E).",
+  "license": "MIT",
+  "bin": {
+    "hookaudit": "./bin/hookaudit.js"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "test": "node --test test/hookaudit.test.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

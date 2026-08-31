@@ -1,0 +1,3 @@
+[project]
+track = "E"
+pitch = "A zero-dependency local scanner that catches auto-executing AI-agent, editor, and package-lifecycle hooks — the config-file execution path that dependency scanners don't look at."

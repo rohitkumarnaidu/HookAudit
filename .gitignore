@@ -1,0 +1,15 @@
+# HookAudit — local-only baseline and system artifacts
+.hookaudit/
+node_modules/
+dist/
+build/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.local
+
+# Temporary fixtures / markers for never-execute tests
+/tmp/
+hookaudit-*/
