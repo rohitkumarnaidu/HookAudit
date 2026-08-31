@@ -323,10 +323,14 @@
     btnAll.type = 'button'; btnAll.dataset.filter = 'all';
     var btnHigh = el('button', 'btn btn--sm', 'High-risk only');
     btnHigh.type = 'button'; btnHigh.dataset.filter = 'high';
-    var btnNetwork = el('button', 'btn btn--sm', 'Network paths');
+    var btnNetwork = el('button', 'btn btn--sm', 'Network');
     btnNetwork.type = 'button'; btnNetwork.dataset.filter = 'network';
+    var btnProcess = el('button', 'btn btn--sm', 'Process');
+    btnProcess.type = 'button'; btnProcess.dataset.filter = 'process';
+    var btnUnres = el('button', 'btn btn--sm', 'Unresolved');
+    btnUnres.type = 'button'; btnUnres.dataset.filter = 'unresolved';
     filterBar.appendChild(el('span', 'graph-filter-label', 'Filter:'));
-    filterBar.appendChild(btnAll); filterBar.appendChild(btnHigh); filterBar.appendChild(btnNetwork);
+    filterBar.appendChild(btnAll); filterBar.appendChild(btnHigh); filterBar.appendChild(btnNetwork); filterBar.appendChild(btnProcess); filterBar.appendChild(btnUnres);
     var hint = el('div', 'graph-hint', 'Click or press Enter on a node to inspect. Arrow keys move focus. High-risk edges are emphasized.');
     hint.setAttribute('role', 'note');
 
@@ -382,9 +386,11 @@
       });
     });
 
-    // Determine high-risk node ids for filtering
+     // Determine high-risk node ids for filtering
     var highRiskNodeIds = new Set();
     var networkNodeIds = new Set();
+    var processNodeIds = new Set();
+    var unresolvedNodeIds = new Set();
     var pathByNode = {}; // nodeId -> [pathIds]
     paths.forEach(function (p) {
       p.nodes.forEach(function (nid) {
@@ -393,13 +399,26 @@
       });
       if (p.risk === 'HIGH' || p.risk === 'CRITICAL') p.nodes.forEach(function (nid) { highRiskNodeIds.add(nid); });
       if (p.capabilities.indexOf('NETWORK_ACCESS') !== -1 || p.capabilities.indexOf('REMOTE_DOWNLOAD') !== -1) p.nodes.forEach(function (nid) { networkNodeIds.add(nid); });
+      if (p.capabilities.indexOf('PROCESS_EXECUTION') !== -1) p.nodes.forEach(function (nid) { processNodeIds.add(nid); });
+      if (p.confidence === 'LOW' || (p.capabilities.indexOf('DYNAMIC_EXECUTION') !== -1)) p.nodes.forEach(function (nid) { unresolvedNodeIds.add(nid); });
     });
-    // Also mark capability nodes that are network-related
     nodes.forEach(function (n) {
-      if (n.kind === 'CAPABILITY' && (n.path === 'NETWORK_ACCESS' || n.path === 'REMOTE_DOWNLOAD' || n.path === 'RUNTIME_BOOTSTRAP')) {
-        networkNodeIds.add(n.id);
-      }
+      if (n.kind === 'CAPABILITY' && (n.path === 'NETWORK_ACCESS' || n.path === 'REMOTE_DOWNLOAD' || n.path === 'RUNTIME_BOOTSTRAP')) networkNodeIds.add(n.id);
+      if (n.kind === 'CAPABILITY' && n.path === 'PROCESS_EXECUTION') processNodeIds.add(n.id);
+      if (n.capabilities && (n.capabilities.indexOf('DYNAMIC_EXECUTION') !== -1)) unresolvedNodeIds.add(n.id);
+      if (n.label && n.label.indexOf('(UNRESOLVED)') !== -1) unresolvedNodeIds.add(n.id);
+      if (n.label && n.label.indexOf('(DYNAMIC)') !== -1) unresolvedNodeIds.add(n.id);
+      if (n.label && n.label.indexOf('(BOUNDARY)') !== -1) unresolvedNodeIds.add(n.id);
+      if (n.label && n.label.indexOf('(CYCLE)') !== -1) unresolvedNodeIds.add(n.id);
     });
+    // Also add diagnostic nodes to unresolved
+    if (analysis && analysis.diagnostics) {
+      analysis.diagnostics.forEach(function (d) {
+        if (['UNRESOLVED_REFERENCE','BOUNDARY_VIOLATION','DYNAMIC_EXECUTION','CYCLE_DETECTED'].indexOf(d.code) !== -1) {
+          nodes.forEach(function (n) { if (n.path === d.path || n.label.indexOf(d.path) !== -1) unresolvedNodeIds.add(n.id); });
+        }
+      });
+    }
 
     // Draw edges first (behind nodes)
     var edgeEls = [];
@@ -622,16 +641,20 @@
 
     // Filter interactions
     function applyFilter(kind) {
-      [btnAll, btnHigh, btnNetwork].forEach(function (b) { b.classList.remove('is-active'); });
+      [btnAll, btnHigh, btnNetwork, btnProcess, btnUnres].forEach(function (b) { b.classList.remove('is-active'); });
       if (kind === 'all') btnAll.classList.add('is-active');
       if (kind === 'high') btnHigh.classList.add('is-active');
       if (kind === 'network') btnNetwork.classList.add('is-active');
+      if (kind === 'process') btnProcess.classList.add('is-active');
+      if (kind === 'unresolved') btnUnres.classList.add('is-active');
 
       nodeEls.forEach(function (ng) {
         var nid = ng.dataset.nodeId;
         var show = true;
         if (kind === 'high') show = highRiskNodeIds.has(nid);
         if (kind === 'network') show = networkNodeIds.has(nid);
+        if (kind === 'process') show = processNodeIds.has(nid);
+        if (kind === 'unresolved') show = unresolvedNodeIds.has(nid);
         ng.style.opacity = show ? '1' : '0.18';
         ng.style.pointerEvents = show ? 'auto' : 'none';
         ng.setAttribute('aria-hidden', show ? 'false' : 'true');
@@ -640,12 +663,27 @@
         var show = true;
         if (kind === 'high') show = highRiskNodeIds.has(eg.dataset.from) && highRiskNodeIds.has(eg.dataset.to);
         if (kind === 'network') show = networkNodeIds.has(eg.dataset.from) || networkNodeIds.has(eg.dataset.to);
+        if (kind === 'process') show = processNodeIds.has(eg.dataset.from) || processNodeIds.has(eg.dataset.to);
+        if (kind === 'unresolved') show = unresolvedNodeIds.has(eg.dataset.from) || unresolvedNodeIds.has(eg.dataset.to);
         eg.style.opacity = show ? '1' : '0.12';
+      });
+      // Also sync outer chips
+      document.querySelectorAll('.chip[data-filter]').forEach(function (c) {
+        c.classList.toggle('is-active', c.dataset.filter === kind);
       });
     }
     btnAll.addEventListener('click', function () { applyFilter('all'); });
     btnHigh.addEventListener('click', function () { applyFilter('high'); });
     btnNetwork.addEventListener('click', function () { applyFilter('network'); });
+    btnProcess.addEventListener('click', function () { applyFilter('process'); });
+    btnUnres.addEventListener('click', function () { applyFilter('unresolved'); });
+    // Handle outer toolbar chips (index.html hero toolbar)
+    document.querySelectorAll('.chip--filter[data-filter]').forEach(function (outer) {
+      outer.addEventListener('click', function () {
+        var k = outer.dataset.filter;
+        applyFilter(k);
+      });
+    });
 
     // Also add subtle depth labels at top
     var axis = el('div', 'graph-axis');
@@ -914,6 +952,16 @@
     renderGraph: renderGraph,
     renderCapabilityDiff: renderCapabilityDiff,
     filterEvidenceRows: filterEvidenceRows,
-    prefersReducedMotion: prefersReducedMotion
+    prefersReducedMotion: prefersReducedMotion,
+    filterGraph: function (kind) {
+      var wrap = document.getElementById('graph-interactive');
+      if (wrap) {
+        var btn = wrap.querySelector('[data-filter="' + kind + '"]');
+        if (btn) btn.click();
+      }
+      document.querySelectorAll('.chip[data-filter]').forEach(function (c) {
+        c.classList.toggle('is-active', c.dataset.filter === kind);
+      });
+    }
   };
 })();

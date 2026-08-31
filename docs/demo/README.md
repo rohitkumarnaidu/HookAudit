@@ -20,27 +20,30 @@ This satisfies the task requirement: “honest: browser demo is adapter, not sam
 
 ---
 
-## 2. Demo architecture — pipeline is the same
+## 2. Demo architecture — pipeline is the same (enterprise rebuild 2026-09-01)
+
+Enterprise rebuild preserves analysis pipeline but reorganizes hierarchy to make the execution graph the hero and reduce cognitive overload (see master prompt §5-8):
 
 ```
-index.html
-  ├─ masthead (honest scope + security note: no eval/spawn/fetch of fixture URLs)
-  ├─ repo selector (4 fixtures — deterministic, zero-dep)
-  ├─ dashboard (thin metrics — derived, not decorative)
-  ├─ demo-grid (2-column)
-  │   ├─ left: file exhibit (click to inspect — content never executed)
-  │   │       terminal (honest simulation — labels “simulated, offline”)
-  │   │       baseline & change (Save baseline → Simulate change → Diff vs baseline)
-  │   │                          └─ capability diff viz (matrix baseline vs current)
-  │   └─ right: scan summary (surfaces/withFindings/high-risk/decision)
-  │            interactive graph (SVG from live graph — §2.1)
-  │            execution paths (sorted CRITICAL-first, with chain)
-  │            capabilities (only actual — chips appear when detector fires)
-  │            risk view (rule table transparent)
-  │            evidence (richer explorer — §2.3)
-  │            diagnostics (UNRESOLVED/BOUNDARY/DYNAMIC/CYCLE honest)
-  └─ footer
+index.html — enterprise dark slate (zero-dep, file:// compatible)
+  ├─ masthead: HOOKAUDIT · kicker · Local/Zero Deps/Static · Public source + Reset (subtle)
+  │           workflow steps 01 DISCOVER → 02 TRACE → 03 ANALYZE → 04 TRUST → 05 WATCH (active state)
+  │           DEMO MODE compact bar + [About this demo] expandable
+  ├─ repo selector (5 fixtures, status one-liners, no paragraphs)
+  ├─ unified summary — single metrics row (6 cards, derived live, clickable trace)
+  │     Execution Surfaces · Paths · High Risk · Capabilities · Changes (NEW_CAPABILITY) · Unresolved
+  ├─ topology-row: [Execution surfaces list 300px] + [Hero Execution Topology SVG + Topology/Terminal tabs]
+  │                · graph is central, 5 filters (All/High/Network/Process/Unresolved), keyboard nav
+  ├─ selected path — HERO explanation (risk badge HIGH/CRITICAL, confidence, chain TRIGGER→COMMAND→SCRIPT→CAPABILITY, why matters)
+  ├─ caps-risk-grid: [Capabilities tags] + [Risk ≠ malware, why list, expandable rule table]
+  ├─ evidence — compact rows, search/detector/confidence/file filters, pagination 10/page, click→file trace
+  ├─ file exhibit — secondary, collapsible, hash + text rendering (escaped)
+  ├─ baseline workflow — guided 1 Save → 2 Simulate incoming change → 3 Compare → 4 Review NEW_CAPABILITY matrix
+  ├─ advanced (collapsed <details>): Policy · Diagnostics · Branches · Exports (JSON/SARIF/HTML) · CLI · Zero-Dep proof · About adapter
+  └─ footer — honest, offline, baseline does not prove safety
 ```
+
+Original 2-column demo-grid preserved in code for compatibility but visually superseded by topology-row + selected-path hero + advanced accordion. All legacy IDs retained for test compatibility (stat-surfaces, etc hidden).
 
 **File responsibilities — strict separation kept:**
 
