@@ -207,31 +207,26 @@
 
   // Workflow steps — enterprise guided journey 01-05
   function updateWorkflowSteps() {
-    var steps = document.querySelectorAll('#workflow-steps .step');
-    steps.forEach(function (s) { s.classList.remove('is-active', 'is-done'); s.querySelector('.step-state').textContent = ''; });
-    var d = document.getElementById('step-discover');
-    var t = document.getElementById('step-trace');
-    var an = document.getElementById('step-analyze');
-    var tr = document.getElementById('step-trust');
-    var w = document.getElementById('step-watch');
+    var steps = document.querySelectorAll('.steps-bar .step');
+    steps.forEach(function (s) { s.classList.remove('is-active', 'is-done'); var dot = s.querySelector('.step-dot'); if (dot) dot.textContent = ''; });
+    var d = document.querySelector('.steps-bar [data-step="discover"]');
+    var det = document.querySelector('.steps-bar [data-step="detect"]');
+    var t = document.querySelector('.steps-bar [data-step="trace"]');
+    var an = document.querySelector('.steps-bar [data-step="analyze"]');
+    var w = document.querySelector('.steps-bar [data-step="watch"]');
     if (!analysis) { if (d) d.classList.add('is-active'); return; }
-    // after scan: discover done, trace+analyze active
-    if (d) { d.classList.add('is-done'); d.querySelector('.step-state').textContent = '\u2713'; }
+    if (d) { d.classList.add('is-done'); var dd = d.querySelector('.step-dot'); if (dd) dd.textContent = '\u2713'; }
+    if (det) det.classList.add('is-active');
     if (t) t.classList.add('is-active');
     if (an) an.classList.add('is-active');
     if (baselineRecord) {
-      if (t) t.classList.add('is-done');
-      if (an) an.classList.add('is-done');
-      if (tr) { tr.classList.add('is-active'); tr.querySelector('.step-state').textContent = '\u25CF'; }
-      // if baseline done, mark trace/analyze done
-      if (t) t.querySelector('.step-state').textContent = '\u2713';
-      if (an) an.querySelector('.step-state').textContent = '\u2713';
+      if (det) { det.classList.add('is-done'); var detDot = det.querySelector('.step-dot'); if (detDot) detDot.textContent = '\u2713'; }
+      if (t) { t.classList.add('is-done'); var tDot = t.querySelector('.step-dot'); if (tDot) tDot.textContent = '\u2713'; }
+      if (an) { an.classList.add('is-done'); var anDot = an.querySelector('.step-dot'); if (anDot) anDot.textContent = '\u2713'; }
+      if (w) { w.classList.add('is-active'); var wDot = w.querySelector('.step-dot'); if (wDot) wDot.textContent = '\u25CF'; }
     }
     if (baselineRecord && diffResult) {
-      if (tr) { tr.classList.remove('is-active'); tr.classList.add('is-done'); tr.querySelector('.step-state').textContent = '\u2713'; }
-      if (w) { w.classList.add('is-active'); w.querySelector('.step-state').textContent = '\u25CF'; }
-    } else if (baselineRecord && !diffResult) {
-      // baseline saved but no diff yet — trust active
+      if (w) { w.classList.add('is-done'); var wDot2 = w.querySelector('.step-dot'); if (wDot2) wDot2.textContent = '\u2713'; }
     }
   }
 
@@ -939,7 +934,7 @@
     const btnHtml = document.getElementById('btn-export-html');
     if (btnJson) btnJson.addEventListener('click', function(){
       if (!analysis) return;
-      const payload = { version:1, repository:{ path: currentFixture?currentFixture.id:'demo' }, summary: analysis.summary, results: analysis.results, graph: analysis.graph, capabilities: [...new Set(analysis.results.flatMap(r=>r.capabilities||[]))].sort(), diagnostics: analysis.diagnostics };
+      const payload = { version:1, repository:{ path: currentId }, summary: analysis.summary, results: analysis.results, graph: analysis.graph, capabilities: [...new Set(analysis.results.flatMap(r=>r.capabilities||[]))].sort(), diagnostics: analysis.diagnostics };
       downloadBlob(JSON.stringify(payload,null,2), 'application/json', 'hookaudit-report.json');
     });
     if (btnSarif) btnSarif.addEventListener('click', function(){
@@ -957,7 +952,7 @@
     });
     if (btnHtml) btnHtml.addEventListener('click', function(){
       if (!analysis) return;
-      const html = '<!DOCTYPE html><html><head><meta charset=&quot;utf-8&quot;><title>HookAudit Report — ' + (currentFixture?currentFixture.id:'demo') + '</title><style>body{font-family:sans-serif; padding:24px; background:#080c14; color:#e2e8f0}</style></head><body><h1>HookAudit Report — ' + (currentFixture?currentFixture.id:'demo') + '</h1><pre>' + JSON.stringify(analysis.summary,null,2).replace(/</g,'&lt;') + '</pre><p>Full HTML export via CLI: node bin/hookaudit.js --html report.html</p></body></html>';
+      const html = '<!DOCTYPE html><html><head><meta charset=&quot;utf-8&quot;><title>HookAudit Report — ' + currentId + '</title><style>body{font-family:sans-serif; padding:24px; background:#080c14; color:#e2e8f0}</style></head><body><h1>HookAudit Report — ' + currentId + '</h1><pre>' + JSON.stringify(analysis.summary,null,2).replace(/</g,'&lt;') + '</pre><p>Full HTML export via CLI: node bin/hookaudit.js --html report.html</p></body></html>';
       downloadBlob(html, 'text/html', 'hookaudit-report.html');
     });
     // Header reset
@@ -971,7 +966,7 @@
     list.innerHTML = '';
     if (!analysis) return;
     const diags = analysis.diagnostics || [];
-    count.textContent = diags.length ? diags.length + ' diagnostic(s)' : '0';
+    if (count) count.textContent = diags.length ? diags.length + ' diagnostic(s)' : '0';
     if (!diags.length) {
       list.appendChild(el('div', 'empty', 'No diagnostics — all references resolved within repository boundary, no cycles, no dynamic constructs.'));
       return;
@@ -1217,23 +1212,66 @@
     renderAll();
   }
 
-  function setupTabs() {
-    var tabTopo = document.getElementById('tab-topology');
-    var tabTerm = document.getElementById('tab-terminal');
-    var topoView = document.getElementById('topology-view');
-    var termView = document.getElementById('terminal-view');
-    if (!tabTopo || !tabTerm) return;
-    function activate(view) {
-      var isTopo = view === 'topology';
-      tabTopo.classList.toggle('is-active', isTopo);
-      tabTerm.classList.toggle('is-active', !isTopo);
-      tabTopo.setAttribute('aria-selected', isTopo ? 'true' : 'false');
-      tabTerm.setAttribute('aria-selected', !isTopo ? 'true' : 'false');
-      topoView.hidden = !isTopo;
-      termView.hidden = isTopo;
-    }
-    tabTopo.addEventListener('click', function () { activate('topology'); });
-    tabTerm.addEventListener('click', function () { activate('terminal'); });
+  function navigatePage(page) {
+    currentPage = page;
+    document.querySelectorAll('.page-view').forEach(function (p) { p.hidden = true; });
+    var target = document.getElementById('page-' + page);
+    if (target) target.hidden = false;
+    document.querySelectorAll('.page-tab').forEach(function (tab) {
+      tab.classList.toggle('is-active', tab.getAttribute('data-page') === page);
+      tab.setAttribute('aria-selected', tab.getAttribute('data-page') === page ? 'true' : 'false');
+    });
+  }
+
+  var STEP_CONTENT_MAP = {
+    discover: 'step-discover-content',
+    detect: 'step-detect-content',
+    trace: 'step-trace-content',
+    analyze: 'step-analyze-content',
+    watch: 'step-watch-content'
+  };
+
+  function navigateStep(step) {
+    currentStep = step;
+    document.querySelectorAll('.step-content').forEach(function (s) { s.style.display = 'none'; });
+    var showId = STEP_CONTENT_MAP[step];
+    var show = showId ? document.getElementById(showId) : null;
+    if (show) show.style.display = '';
+    document.querySelectorAll('.steps-bar .step').forEach(function (s) {
+      s.classList.toggle('is-active', s.getAttribute('data-step') === step);
+    });
+  }
+
+  function renderTourStep() {
+    var s = TOUR_STEPS[tourStep];
+    if (!s) return;
+    var title = document.getElementById('tour-title');
+    var desc = document.getElementById('tour-desc');
+    var text = document.getElementById('tour-text');
+    var progress = document.getElementById('tour-progress');
+    if (title) title.textContent = s.title;
+    if (desc) desc.textContent = s.desc;
+    if (text) text.textContent = s.text;
+    if (progress) progress.textContent = 'Step ' + (tourStep + 1) + ' of ' + TOUR_STEPS.length;
+    if (s.target) { var elTarget = document.querySelector(s.target); if (elTarget) elTarget.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  }
+
+  function showTour() {
+    tourStep = 0;
+    renderTourStep();
+    var overlay = document.getElementById('tour-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+  }
+
+  function tourNext() {
+    tourStep++;
+    if (tourStep >= TOUR_STEPS.length) { hideTour(); return; }
+    renderTourStep();
+  }
+
+  function hideTour() {
+    var overlay = document.getElementById('tour-overlay');
+    if (overlay) overlay.classList.add('hidden');
   }
 
   function setupAbout() {
@@ -1274,7 +1312,7 @@
     if (tourBtn) tourBtn.addEventListener('click', showTour);
     var tourNextBtn = document.getElementById('tour-next');
     if (tourNextBtn) tourNextBtn.addEventListener('click', tourNext);
-    var tourSkip = document.getElementById('btn-tour-skip');
+    var tourSkip = document.getElementById('tour-skip');
     if (tourSkip) tourSkip.addEventListener('click', hideTour);
     // Start scan button
     var startBtn = document.getElementById('btn-start-scan');
@@ -1296,10 +1334,10 @@
         }
       });
     });
-    document.getElementById('btn-baseline').addEventListener('click', handleBaseline);
-    document.getElementById('btn-change').addEventListener('click', handleChange);
-    document.getElementById('btn-diff').addEventListener('click', handleDiff);
-    document.getElementById('btn-reset').addEventListener('click', handleReset);
+    var btnBase = document.getElementById('btn-baseline'); if (btnBase) btnBase.addEventListener('click', handleBaseline);
+    var btnChg = document.getElementById('btn-change'); if (btnChg) btnChg.addEventListener('click', handleChange);
+    var btnDiff = document.getElementById('btn-diff'); if (btnDiff) btnDiff.addEventListener('click', handleDiff);
+    var btnReset = document.getElementById('btn-reset'); if (btnReset) btnReset.addEventListener('click', handleReset);
     // Evidence explorer toolbar
     const search = document.getElementById('evidence-search');
     const detSel = document.getElementById('evidence-detector');
