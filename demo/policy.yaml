@@ -1,0 +1,22 @@
+# demo/policy.yaml — Minimal local policy layer — zero-dep, stdlib only, honest.
+# Controls CI gate without heuristic overrides. Never silences evidence, only maps severities/risks to BLOCK/REVIEW/PASS.
+# Parsed by bin/hookaudit.js:parseYamlPolicy (minimal safe subset).
+# Supported subset: mappings, block lists (- item), inline arrays ["CRITICAL","HIGH"], strings/booleans/numbers, one-level nesting, # comments.
+# See plans/yaml-toml-policy-patch.md §3 for full subset & limitations.
+
+version: 1
+description: "Minimal local policy layer — zero-dep, stdlib only, honest. Controls CI gate without heuristic overrides. Never silences evidence, only maps severities/risks to BLOCK/REVIEW/PASS."
+blockOn:
+  - CRITICAL
+  - HIGH
+warnOn:
+  - MEDIUM
+  - WARN
+notes: "Evaluated locally in bin/hookaudit.js via Node built-ins only. No network, no extra deps. If .hookaudit/policy.yaml exists it is used; otherwise demo/policy.yaml is an example. PASS/REVIEW/BLOCK mapping respects policy but never hides findings."
+defaults:
+  blockOn:
+    - CRITICAL
+    - HIGH
+  warnOn:
+    - MEDIUM
+    - WARN

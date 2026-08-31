@@ -16,7 +16,13 @@ replacements below are used in `bin/hookaudit.js`; none are hypothetical.
 | 9 | `deep-diff` / `jsdiff` | Hand-written structural diff in `diffAgainstBaseline()` | We only ever diff two flat `{path: sha256}` maps (NEW / CHANGED / REMOVED), which is a ~10-line `Object.entries` loop — a generic diff library would be solving a much bigger problem than we have. |
 | 10 | `dotenv` | *(not needed)* — noted here because it's the canonical "you don't need a package for this" example; if we add config-file support later, `process.loadEnvFile()` (stable since Node v20.6) is the stdlib answer. | N/A |
 | 11 | `execa` / `child_process` wrapper libraries | `node:child_process` → `execFileSync` (test suite only, to invoke the CLI as a subprocess) | Only used in `test/hookaudit.test.js` to black-box test the actual CLI the way a user runs it, not to shell out from the tool itself at runtime. |
-| 12 | `toml` / `@iarna/toml` (for `.codex/config.toml`) | **Not implemented** — `.codex/config.toml` is currently scanned as raw text via the same rule engine as our other text surfaces, not structurally parsed. | **Honest limitation**: Node's stdlib has no TOML reader (confirmed against the hackathon's own cheat-sheet). A structural parse would let us extract exact command fields the way we do for JSON surfaces; raw-text regex scanning is strictly weaker and can miss a hook whose dangerous content is split across TOML's multiline string syntax. This is the top item on our "should have" list if more time is available — see README. |
+| 12 | `toml` / `@iarna/toml` (for `.codex/config.toml`) | **Subset implemented for policy + heuristic scan for surfaces** — `.codex/config.toml` still heuristic raw-text; policy TOML (`policy.toml`) parsed via 120-line `parseTomlPolicy()` using `node:fs` string ops (tables, string arrays, scalars) with 64 KiB/8-depth caps, no `yaml` package. | For surfaces we keep heuristic (no full TOML AST needed); for policy we support `blockOn = ["CRITICAL","HIGH"]` subset honestly documented (see `LIMITATIONS.md`). |
+| 13 | `yaml` / `js-yaml` (for `.github/workflows` + policy) | **Heuristic + minimal policy parser** — workflows scanned via `run:` regex (no yaml AST); policy YAML via 140-line `parseYamlPolicy()` (mappings, block lists `- CRITICAL`, inline arrays, `#` comments) with caps, no `js-yaml`. | Workflows: triggers `push/pull_request/schedule` as auto via regex window; policy supports `blockOn: - CRITICAL` subset. Full AST deferred — documented `LIMITATIONS.md`. |
+| 14 | `sarif` / `sarif-builder` | `JSON.stringify` + custom `generateSarif()` → SARIF 2.1.0 via stdlib only | Deterministic rule IDs `HOOKAUDIT.<capability>` + `HOOKAUDIT.<DIAGNOSTIC>`, level mapping `error/warning/note`, fingerprint `sha256(file:field:command:cap).slice(0,16)`, no external validator needed (internal structural tests). |
+| 15 | `handlebars` / `ejs` / HTML templating | `generateHtmlReport()` string template + `escapeHtml()` via `replace(/[&<>"]/g)` | Self-contained `file://` report, inline CSS/JS, no CDN, safe `textContent`-equivalent escaping, deterministic layout. |
+| 16 | `simple-git` / `isomorphic-git` | `node:zlib` → `inflateSync` + `node:fs` `readFileSync` on `.git/objects`, `HEAD`, `refs/heads`, `packed-refs` | Local branch walker without `git` exec — `discoverBranches`, `inflateGitObject`, `parseCommit/parseTree` with 5 MiB/64-depth/4096-entry caps, bounded traversal pruned by `isSurfaceRelevant()`. |
+| 17 | `shell-quote` / `shell-parser` | `parseCommandSpec()` enhanced: single/double quotes, escaped spaces, `shell` detection `[|&;`$<>]` | Still bounded — no `$(...)` expansion, dynamic → `DYNAMIC_EXECUTION` LOW, chains `bash a.sh && bash b.sh` both extracted via global regex. |
+| 18 | `ignore` extension for `.github` | Extended `resolveSurfaceFiles` + `scanVirtualFile` for `.github/workflows` via `.ya?ml` filter | Reuses existing `IGNORED_DIRS` + `MAX_FILE_SIZE`/`BINARY_CHECK` guards. |
 
 ## What we did *not* build (by design)
 
@@ -24,9 +30,4 @@ replacements below are used in `bin/hookaudit.js`; none are hypothetical.
   operation in this project is SHA-256 file hashing via `node:crypto`,
   used purely for change detection, never for confidentiality or
   authentication claims.
-- **No shelling out to `git`.** The rules explicitly disallow hidden
-  runtime dependencies on separately installed tools. We do not invoke
-  the `git` binary anywhere. Consequence (documented limitation): the
-  MVP scans the *currently checked-out* working tree only, not every
-  local branch. See README "Limitations" for what a git-native
-  (zlib-based, no-subprocess) multi-branch walker would require.
+- **No shelling out to `git` for normal scan.** The rules explicitly disallow hidden runtime dependencies. Normal `scan`/`diff` still scans working tree only. **New:** `hookaudit branches` reads `.git` directly via `node:zlib` + `node:fs` without `git` exec — see `docs/demo/README.md` § branches.

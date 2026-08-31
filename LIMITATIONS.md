@@ -5,30 +5,24 @@
 
 HookAudit is a **static, local, file-integrity tripwire** — not a sandbox, not a proof of safety. Please read these limits before relying on its output.
 
-## 1. Working Tree Only (Not All Branches)
+## 1. Working Tree + Local Git Branch Walker
 
-**Today:** HookAudit scans the **currently checked-out working tree** via direct filesystem reads. It does **not** walk every local branch.
+**Working tree:** HookAudit scans the **currently checked-out working tree** via direct filesystem reads. **New in this build:** `hookaudit branches .` also reads **local** branch execution surfaces without `git` exec — via `.git/HEAD` + `refs/heads/*` + `packed-refs` and `node:zlib` inflate of `commit/tree/blob` objects (bounded: 5 MiB object, 64-depth, 4096 entries, 64 branches). This covers committed branch drift (`NEW_TRIGGER/NEW_CAPABILITY`) locally. It does NOT fetch remotes, clone, or access credentials/server-side history. If you need multi-branch assurance, use `hookaudit branches . --json` or `git worktree`.
 
-**Why:** The hackathon rules explicitly forbid hiding a runtime dependency on the `git` binary. Shelling out to `git log --all -- .claude/settings.json` would be a disqualifying hidden dependency.
+**Why not `git` binary:** Shelling out would be a hidden runtime dependency (DSQ). The walker reads `.git` on-disk format legally under zero-dep rules.
 
-**What the attacker literature says:** The August 2026 ChainDrop worm *specifically* committed its hooks into **branches other than `main`** so that a review of `main` alone would miss them. Incident responders advised checking every branch, not just `main`.
+**Limitation:** Branch walker reads **committed** trees only; `.git/hooks` is local machine state (not committed) and is excluded. Packed-refs deltas that require packfile delta resolution beyond loose objects are reported as `UNSUPPORTED_FORMAT` where not yet supported. Treat branch objects as untrusted (malformed→diagnostic, not crash).
 
-**Documented stretch (not in this build):** A git-native branch walker that reads `.git/refs/heads/*` and `.git/packed-refs` directly, then inflates loose objects via `node:zlib` (stdlib) to walk each branch’s tree **without** invoking `git` — legal under the rules because it only reads `.git`’s on-disk format. This is the single most valuable future addition and the top item in `PLAN.md:5`.
+## 2. TOML / YAML — Heuristic Scan + Minimal Policy Parsers
 
-**Until then:** If you need multi-branch assurance today, run HookAudit after checking out each branch you care about, or use `git worktree`.
+**Surfaces still heuristic:**
 
-## 2. No TOML / YAML Structural Parsing
+- `.codex/config.toml`, `.pre-commit-config.yaml` — raw-text heuristic (no full AST), same as before.
+- `.github/workflows/*.yml` — new in this build: `run:` heuristic via `on:` + `run:` regex (no YAML AST), documented as heuristic.
 
-**Affected surfaces:**
+**Why heuristic for surfaces:** Node has no stdlib YAML/TOML reader and a full ASTM would be unbounded; heuristic catches blunt `curl|eval` via whole-file sweep but can miss multiline split.
 
-- `.codex/config.toml` — scanned as **raw text** via the same heuristic engine as other surfaces, not structurally parsed.
-- `.pre-commit-config.yaml` / `.pre-commit-config.yml` — same raw-text treatment.
-
-**Why:** Node’s standard library has **no TOML or YAML reader** (confirmed against the hackathon’s own cheat-sheet). A correct hand-rolled parser for either was out of scope for this build (and a bad parser would be worse than honest raw-text scanning — it would create false certainty).
-
-**Consequence:** A hook whose dangerous content is split across TOML’s multiline-string syntax (`"""` or `'''`) or YAML’s block scalars could be missed by field-level extraction. The whole-file text sweep still runs, so a blunt `curl https://evil` or `eval(` inside the file will still be caught, but a subtly structured evasion might not.
-
-**Top of “should have” if time permits:** Structural parse for at least Codex TOML’s hook-relevant fields (see `STDLIB.md:11`).
+**New — Policy parsers (subset, stdlib only):** `policy.yaml/yml` → 140-line `parseYamlPolicy()` (mappings, block lists `- CRITICAL`, inline arrays `["CRITICAL","HIGH"]`, `#` comments, 64 KiB/8-depth caps) and `policy.toml` → 120-line `parseTomlPolicy()` (tables, string arrays `blockOn = ["CRITICAL"]`, scalars). Unsupported features (tags `!include`, anchors `&*`, `[[array.tables]]`, `"""` multiline) → `UNSUPPORTED_FORMAT` diagnostic, not crash. See `STDLIB.md:12-13`.
 
 ## 3. Heuristic, Not Exhaustive — Designed to Under-Flag
 
@@ -86,11 +80,11 @@ Evidence: dynamic reference ${process.env.HOOK}/setup.sh
 Why: potential impact high but static interpretation incomplete (dynamic construction)
 ```
 
-## 6. Unsupported Ecosystems
+## 6. Supported / Unsupported Ecosystems
 
-**Supported today (11):** Claude Code, MCP, VS Code (tasks + settings), Cursor, Gemini, Codex (heuristic), npm lifecycle, Husky, git hooks, pre-commit.
+**Supported today (12):** Claude Code, MCP, VS Code (tasks + settings), Cursor, Gemini, Codex (heuristic), npm lifecycle, Husky, git hooks, pre-commit, **GitHub Actions (`.github/workflows` heuristic)**.
 
-**Not supported (future adapters, not MVP blockers):** GitHub Copilot, Windsurf, other AI agents, additional IDEs, CI systems, additional MCP project configs, other task runners (see `docs/spec` §5). If a repository uses an unsupported surface, HookAudit will emit **no finding** for it and will not warn — which is why the human report will add (Day-1 stretch):
+**Not supported (future adapters, not MVP blockers):** GitHub Copilot, Windsurf, other AI agents, additional IDEs, other CI beyond GitHub, additional MCP project configs, other task runners (see `docs/spec` §5). If a repository uses an unsupported surface, HookAudit will emit **no finding** for it and will not warn — which is why the human report will add (Day-1 stretch):
 
 ```
 Unsupported execution surfaces were not analyzed.
@@ -116,7 +110,7 @@ HookAudit never fetches remote URLs, never executes extracted commands, never lo
 | Concern | Mitigation |
 |---|---|
 | “Is this repo safe?” | **Never say so from one tool.** HookAudit answers one slice (config-file execution topology). Combine with dependency/CVE scanning, code review, and branch-aware checks. |
-| Multi-branch worm | Check out each branch and re-scan, or await the git-native walker (Day-2 stretch). |
+| Multi-branch worm | `hookaudit branches .` for local committed drift, or `git worktree` per branch. |
 | New commit after trust | `hookaudit diff .` on every pull/checkout — any `NEW`/`CHANGED`/`REMOVED` is worth review even if heuristics score it low. |
 | Need stricter CI gate | Use `hookaudit . --strict` (Day-1) — exits 1 on `WARN` as well as `CRITICAL`. |
 | Need to prove “never executes” | See `test/hookaudit.test.js` `never-execute` — `echo pwned > marker` after `scan` asserts `marker` does NOT exist (permanent regression). |

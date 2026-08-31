@@ -10,7 +10,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "test": "node --test test/hookaudit.test.js test/demo.test.js"
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {},
   "devDependencies": {}

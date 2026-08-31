@@ -53,11 +53,33 @@
     { id: 'package-lifecycle', globs: ['package.json'], kind: 'json', describe: 'npm lifecycle scripts' },
     { id: 'husky-hooks', globs: ['.husky'], kind: 'text-dir', describe: 'Husky-managed git hook scripts' },
     { id: 'git-hooks', globs: ['.git/hooks'], kind: 'text-dir', describe: 'Local git hook scripts' },
-    { id: 'precommit-config', globs: ['.pre-commit-config.yaml', '.pre-commit-config.yml'], kind: 'text', describe: 'pre-commit framework configuration' }
+    { id: 'precommit-config', globs: ['.pre-commit-config.yaml', '.pre-commit-config.yml'], kind: 'text', describe: 'pre-commit framework configuration' },
+    { id: 'github-workflows', globs: ['.github/workflows'], kind: 'yaml-dir', describe: 'GitHub Actions workflows (on push/PR, run: commands) — heuristic raw-text YAML' }
   ];
 
   const AUTO_TRIGGER_KEYS = ['SessionStart', 'PreToolUse', 'PostToolUse', 'UserPromptSubmit'];
   const SURFACE_DIRS = ['.claude', '.vscode', '.cursor', '.gemini', '.codex', '.husky', '.github'];
+  const GITHUB_KNOWN_TRIGGERS = ['push', 'pull_request', 'workflow_dispatch', 'schedule', 'workflow_call', 'repository_dispatch'];
+  const GITHUB_AUTO_TRIGGERS = new Set(['push', 'pull_request', 'schedule']);
+  function parseGithubTriggers(text) {
+    const m = text.match(/^\s*on\s*:\s*(.*)$/m);
+    const triggers=[]; if(!m) return triggers;
+    const win=text.slice(m.index, m.index+1200).split('\n').filter(l=>!/^\s*#/.test(l)).join('\n').toLowerCase();
+    for(const t of GITHUB_KNOWN_TRIGGERS){ const re=new RegExp('(^|[^a-z0-9_])'+t+'([^a-z0-9_]|$)','i'); if(re.test(win)) triggers.push(t); }
+    return [...new Set(triggers)];
+  }
+  function extractGithubWorkflowCommands(content){
+    const triggers=parseGithubTriggers(content); const isAuto=triggers.some(t=>GITHUB_AUTO_TRIGGERS.has(t)); const wf=triggers.length?triggers.join(','):'workflow';
+    const lines=content.split('\n'); const res=[]; let curJob=null, step=-1, inJobs=false;
+    for(let i=0;i<lines.length;i++){ const line=lines[i]; if(/^\s*jobs\s*:\s*$/.test(line)){inJobs=true;continue;} if(inJobs){ const jm=line.match(/^\s{2}([A-Za-z0-9_\-]+)\s*:\s*$/); if(jm && !['steps','runs-on','needs','strategy','env','if','permissions'].includes(jm[1])){curJob=jm[1];step=-1;continue;} if(/^\s*-\s*(name|uses|run)\s*:/.test(line)){ if(/^\s*-\s*name\s*:/.test(line)||/^\s*-\s*uses\s*:/.test(line)) step++; else if(/^\s*-\s*run\s*:/.test(line)) step++; } }
+      const runMatch=line.match(/^\s*(?:-\s*)?run\s*:\s*(\|?-?)\s*(.*)$/); if(!runMatch) continue;
+      const pipe=runMatch[1]; const inline=(runMatch[2]||'').trim(); let cmd='';
+      if(pipe&&pipe.startsWith('|')){ const block=[]; let j=i+1; while(j<lines.length){ const nl=lines[j]; if(nl.trim()===''){block.push('');j++;continue;} if(/^\s{6,}\S/.test(nl)||/^\s*\t/.test(nl)){block.push(nl.trim());j++;} else break; } cmd=(inline?inline+'\n':'')+block.join('\n'); cmd=cmd.trim(); } else cmd=inline;
+      if(!cmd) continue; const field=curJob?`jobs.${curJob}.steps[${Math.max(0,step)}].run`:`steps[${res.length}].run`; const trigger=curJob?`${wf}:${curJob}`:wf; res.push({trigger,command:cmd,field,auto:isAuto});
+    }
+    if(!res.length){ const re=/run\s*:\s*\|?\s*([^\n]+)/g; let m; let idx=0; while((m=re.exec(content))!==null){ const cmd=(m[1]||'').trim(); if(!cmd||cmd==='|') continue; res.push({trigger:wf,command:cmd,field:`run[${idx}].run`,auto:isAuto}); idx++; } }
+    return res;
+  }
 
   const RULES = [
     {
@@ -582,6 +604,22 @@
           else if (findings.length === 0) findings = findings.concat(sweepFindings);
         }
       }
+    } else if (surface.id === 'github-workflows') {
+      const cmds = extractGithubWorkflowCommands(content);
+      for (let ci = 0; ci < cmds.length; ci++) {
+        const c = cmds[ci];
+        findings = findings.concat(evaluateCommand('.github', c.trigger, c.command, c.auto, relPath, c.field));
+      }
+      const sweepFindings = evaluateCommand('.github', 'file-body', content, false, relPath, null);
+      if (sweepFindings.length) {
+        const existingCaps = new Set();
+        for (let fi = 0; fi < findings.length; fi++) for (let ci = 0; ci < findings[fi].capabilities.length; ci++) existingCaps.add(findings[fi].capabilities[ci]);
+        const newCaps = [];
+        for (let fi = 0; fi < sweepFindings.length; fi++) for (let ci = 0; ci < sweepFindings[fi].capabilities.length; ci++) if (!existingCaps.has(sweepFindings[fi].capabilities[ci])) newCaps.push(sweepFindings[fi].capabilities[ci]);
+        if (newCaps.length > 0) findings = findings.concat(sweepFindings);
+        else if (findings.length === 0) findings = findings.concat(sweepFindings);
+      }
+      if (cmds.length === 0 && content.trim().length > 0) diagnostics.push({ code: DIAGNOSTIC_CODES.UNSUPPORTED_FORMAT, path: relPath, detail: 'No run: commands extracted — heuristic YAML scan (no YAML AST)' });
     } else {
       const auto = surface.id === 'git-hooks' || surface.id === 'husky-hooks';
       const res = evaluateCommand(ownDir, relPath.split('/').pop(), content, auto, relPath, null);
@@ -633,10 +671,14 @@
           const g = s.globs[gi];
           if (g.indexOf('/') !== -1) {
             if (rel === g) matchedSurface = s;
-            // directory prefix for .husky / .git/hooks
+            // directory prefix for .husky / .git/hooks / .github/workflows
             if (g === '.husky' && rel.indexOf('.husky/') === 0) matchedSurface = s;
             if (g === '.git/hooks' && rel.indexOf('.git/hooks/') === 0) {
               if (rel.endsWith('.sample')) matchedSurface = null;
+              else matchedSurface = s;
+            }
+            if (g === '.github/workflows' && rel.indexOf('.github/workflows/') === 0) {
+              if (!/\.ya?ml$/i.test(rel)) matchedSurface = null;
               else matchedSurface = s;
             }
           } else {

