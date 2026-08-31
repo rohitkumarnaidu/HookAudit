@@ -1,6 +1,6 @@
 # LIMITATIONS.md — What HookAudit Cannot Determine
 
-**Version:** 0.1.0 — 2026-08-31  
+**Version:** 0.1.0 — 2026-09-01  
 **Honesty rule:** Unknown is better than invented certainty. This file exists to avoid false confidence.
 
 HookAudit is a **static, local, file-integrity tripwire** — not a sandbox, not a proof of safety. Please read these limits before relying on its output.

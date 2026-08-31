@@ -180,6 +180,18 @@
   let evidenceFilters = { q: '', detector: 'all', confidence: 'all', file: 'all' };
   let evidencePage = 0;
   const EVIDENCE_PAGE_SIZE = 10;
+  // Page + step navigation
+  let currentPage = 'product-story'; // 'product-story' | 'architecture'
+  let currentStep = 'discover'; // 'discover' | 'detect' | 'trace' | 'analyze' | 'watch'
+  // Tour state
+  let tourStep = 0;
+  const TOUR_STEPS = [
+    { title: 'Welcome to HookAudit', desc: 'A 5-step tour of the execution-topology auditor.', text: 'Select a repository fixture to see execution surfaces, trace multi-hop paths, and understand risk.', target: '#repo-grid' },
+    { title: '01 · DISCOVER', desc: 'Find execution surfaces in the repository.', text: 'HookAudit scans config files, scripts, and hooks to discover every surface that can execute code. Surfaces are grouped by ecosystem (Claude, VS Code, npm, etc.).', target: '#surface-explorer' },
+    { title: '02 · DETECT', desc: 'Identify automatic execution triggers.', text: 'Each surface is analyzed for automatic execution: runOn: folderOpen, preinstall scripts, SessionStart hooks. Manual-only surfaces are flagged separately.', target: '#step-detect-content' },
+    { title: '03 · TRACE', desc: 'Resolve multi-hop execution paths.', text: 'The resolver follows references: Hook → Script A → Script B → Network. Multi-hop chains reveal the full execution topology.', target: '#selected-path' },
+    { title: '04 · ANALYZE', desc: 'Map capabilities and compute risk.', text: 'Each path is tagged with capabilities (network, process, obfuscation, etc.) and scored. Risk is explainable — every signal has evidence.', target: '#risk-panel' }
+  ];
 
   // Enterprise status one-liners per spec #9
   const REPO_STATUS = {
@@ -278,11 +290,9 @@
 
     if (primary.capabilities && primary.capabilities.length) {
       var capWrap = el('div', 'selected-caps');
-      capWrap.style.display = 'flex'; capWrap.style.flexWrap = 'wrap'; capWrap.style.gap = '6px'; capWrap.style.marginTop = '8px';
       primary.capabilities.forEach(function (cap) {
         var cc = capChipClass(cap);
         var chip = el('span', 'cap-chip ' + cc, cap);
-        chip.style.cursor = 'pointer';
         chip.title = 'Highlight evidence for ' + cap;
         chip.setAttribute('role', 'button');
         chip.setAttribute('tabindex', '0');
@@ -296,16 +306,13 @@
       main.appendChild(capWrap);
     }
 
-    var viewBtn = el('button', 'btn btn--sm', 'View evidence \u2192');
+    var viewBtn = el('button', 'btn btn-sm mt-2', 'View evidence \u2192');
     viewBtn.type = 'button';
-    viewBtn.style.marginTop = '10px';
     viewBtn.addEventListener('click', function () { document.getElementById('evidence-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     main.appendChild(viewBtn);
 
     var whyPanel = el('div', 'selected-path-why');
-    whyPanel.style.background = 'var(--surface)'; whyPanel.style.border = '1px solid var(--border)'; whyPanel.style.borderRadius = '10px'; whyPanel.style.padding = '12px';
-    var whyTitle = el('div', null, 'Why this matters');
-    whyTitle.style.fontWeight = '800'; whyTitle.style.fontSize = '.84rem'; whyTitle.style.marginBottom = '6px';
+    var whyTitle = el('div', 'selected-path-why-title', 'Why this matters');
     whyPanel.appendChild(whyTitle);
     // find reasons
     var reasons = [];
@@ -322,7 +329,6 @@
       whyList.appendChild(el('li', null, 'Risk derived from automatic trigger + reachable capabilities + confidence.'));
     }
     var riskFoot = el('div', 'micro', 'Risk \u2260 malware. Static evidence, not a malware verdict.');
-    riskFoot.style.marginTop = '8px';
     whyPanel.appendChild(whyList);
     whyPanel.appendChild(riskFoot);
 
@@ -333,18 +339,13 @@
     // secondary list of other paths (collapsible)
     if (paths.length > 1) {
       var otherTitle = el('div', 'micro', 'Other paths — ' + (paths.length - 1) + ' more (click to focus primary graph)');
-      otherTitle.style.marginTop = '12px'; otherTitle.style.fontWeight = '600';
+      
       container.appendChild(otherTitle);
       var otherWrap = el('div', 'other-paths');
-      otherWrap.style.display = 'flex'; otherWrap.style.flexDirection = 'column'; otherWrap.style.gap = '6px'; otherWrap.style.marginTop = '6px';
       paths.slice(1, 4).forEach(function (p) {
-        var row = el('button', 'btn btn--ghost btn--sm');
+        var row = el('button', 'other-path-row');
         row.type = 'button';
-        row.style.justifyContent = 'flex-start';
-        row.style.textAlign = 'left';
-        row.style.fontFamily = 'var(--mono)';
-        row.style.fontSize = '.72rem';
-        row.textContent = p.risk + ' · ' + p.trigger + ' \u2192 ' + p.chain.slice(0, 2).join(' \u2192 ') + (p.chain.length > 2 ? ' \u2192 \u2026' : '');
+        row.textContent = p.risk + ' \u00b7 ' + p.trigger + ' \u2192 ' + p.chain.slice(0, 2).join(' \u2192 ') + (p.chain.length > 2 ? ' \u2192 \u2026' : '');
         row.addEventListener('click', function () {
           // highlight in graph: find node for this path's trigger
           var g = document.getElementById('graph-interactive');
@@ -419,10 +420,7 @@
       // live badge for high-risk fixtures
       if (analysis && currentId === f.id) {
         var high = analysis.summary.highRiskPaths;
-        var badge = el('span', null, high ? high + ' high-risk' : 'no high-risk');
-        badge.style.background = high ? 'rgba(239,68,68,.14)' : 'rgba(34,197,94,.12)';
-        badge.style.borderColor = high ? 'rgba(239,68,68,.3)' : 'rgba(34,197,94,.3)';
-        badge.style.color = high ? '#fecaca' : '#86efac';
+        var badge = el('span', 'badge ' + (high ? 'badge-danger' : 'badge-success'), high ? high + ' high-risk' : 'no high-risk');
         meta.appendChild(badge);
       }
       btn.appendChild(meta);
@@ -655,13 +653,12 @@
     analysis.results.forEach(function (r) { (r.capabilities || []).forEach(function (c) { all.add(c); }); });
     const caps = Array.from(all).sort();
     if (!caps.length) {
-      empty.style.display = 'block';
+      empty.hidden = false;
       return;
     }
-    empty.style.display = 'none';
+    empty.hidden = true;
     caps.forEach(function (cap) {
       var chip = el('span', 'cap-chip ' + capChipClass(cap), cap);
-      chip.style.cursor = 'pointer';
       chip.setAttribute('role', 'button');
       chip.setAttribute('tabindex', '0');
       chip.title = 'Filter evidence for ' + cap;
@@ -750,10 +747,10 @@
     if (pager) {
       pager.innerHTML = '';
       if (pages > 1) {
-        const prev = el('button', 'btn btn--sm' + (evidencePage===0?'':'') , '◀ Prev');
+        const prev = el('button', 'btn btn-sm' + (evidencePage===0?'':'') , '◀ Prev');
         prev.disabled = evidencePage===0; prev.addEventListener('click', function(){ evidencePage--; renderEvidence(); });
         const info = el('span', 'pager-info', 'Page ' + (evidencePage+1) + ' of ' + pages);
-        const next = el('button', 'btn btn--sm', 'Next ▶');
+        const next = el('button', 'btn btn-sm', 'Next ▶');
         next.disabled = evidencePage >= pages-1; next.addEventListener('click', function(){ evidencePage++; renderEvidence(); });
         pager.appendChild(prev); pager.appendChild(info); pager.appendChild(next);
       } else if (pager) pager.textContent = total ? 'Showing ' + total + ' row(s)' : '';
@@ -768,7 +765,7 @@
       const td = document.createElement('td');
       td.colSpan = 6;
       td.textContent = 'No evidence — no findings in this fixture. This is the “clean” state.';
-      td.style.color = 'var(--text-muted)';
+      td.className = 'text-muted text-center';
       tr.appendChild(td); tbody.appendChild(tr);
       return;
     }
@@ -777,9 +774,7 @@
       const td = document.createElement('td');
       td.colSpan = 6;
       td.textContent = 'No rows match current filters — adjust search or clear filters.';
-      td.style.color = 'var(--text-muted)';
-      td.style.textAlign = 'center';
-      td.style.padding = '18px';
+      td.className = 'text-muted text-center';
       tr.appendChild(td); tbody.appendChild(tr);
       // clear pager if no results
       const pg = document.getElementById('evidence-pager');
@@ -795,7 +790,7 @@
       tr.appendChild(tdClass('mono', r.file));
       tr.appendChild(tdClass('mono', r.field));
       tr.appendChild(tdClass('mono', r.detector));
-      const reasonTd = el('td'); reasonTd.textContent = r.reason; reasonTd.style.fontSize = '.78rem'; tr.appendChild(reasonTd);
+      const reasonTd = el('td'); reasonTd.textContent = r.reason; tr.appendChild(reasonTd);
       const exTd = el('td'); const span = el('span', 'excerpt', r.excerpt); exTd.appendChild(span); tr.appendChild(exTd);
       const confTd = el('td'); const chip = el('span', 'conf-chip conf-chip--' + r.confidence.toLowerCase(), r.confidence); confTd.appendChild(chip); tr.appendChild(confTd);
       // highlight matching query in excerpt
@@ -1011,7 +1006,6 @@
     const diffBtn = document.getElementById('btn-diff');
     if (!baselineRecord) {
       box.textContent = 'No baseline saved yet.';
-      box.style.whiteSpace = 'pre-wrap';
       methodEl.textContent = '';
       diffBtn.disabled = true; diffBtn.setAttribute('aria-disabled', 'true');
       changesEl.innerHTML = '<span class="empty">No diff yet — save a baseline first.</span>';
@@ -1250,14 +1244,45 @@
       var expanded = btn.getAttribute('aria-expanded') === 'true';
       btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
       panel.hidden = expanded;
-      btn.textContent = expanded ? 'About this demo' : 'Hide details';
+      btn.textContent = expanded ? 'About' : 'Hide';
+    });
+    // hero variant
+    var heroBtn = document.getElementById('btn-about-demo-hero');
+    if (heroBtn) heroBtn.addEventListener('click', function () {
+      navigatePage('architecture');
+      document.querySelector('.page-tab[data-page="architecture"]')?.classList.add('is-active');
     });
   }
 
   function attachEvents() {
     setupExports();
-    setupTabs();
     setupAbout();
+    // Page navigation
+    document.querySelectorAll('.page-tab').forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        navigatePage(tab.getAttribute('data-page'));
+      });
+    });
+    // Step navigation
+    document.querySelectorAll('.steps-bar .step').forEach(function (step) {
+      step.addEventListener('click', function () {
+        navigateStep(step.getAttribute('data-step'));
+      });
+    });
+    // Tour
+    var tourBtn = document.getElementById('btn-tour');
+    if (tourBtn) tourBtn.addEventListener('click', showTour);
+    var tourNextBtn = document.getElementById('tour-next');
+    if (tourNextBtn) tourNextBtn.addEventListener('click', tourNext);
+    var tourSkip = document.getElementById('btn-tour-skip');
+    if (tourSkip) tourSkip.addEventListener('click', hideTour);
+    // Start scan button
+    var startBtn = document.getElementById('btn-start-scan');
+    if (startBtn) startBtn.addEventListener('click', function () {
+      navigateStep('discover');
+      document.getElementById('repo-grid')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    // Graph filter chips
     document.querySelectorAll('.chip[data-filter]').forEach(function(btn){
       btn.addEventListener('click', function(){
         document.querySelectorAll('.chip[data-filter]').forEach(function(b){ b.classList.remove('is-active'); });
@@ -1275,7 +1300,7 @@
     document.getElementById('btn-change').addEventListener('click', handleChange);
     document.getElementById('btn-diff').addEventListener('click', handleDiff);
     document.getElementById('btn-reset').addEventListener('click', handleReset);
-    // P2: evidence explorer toolbar
+    // Evidence explorer toolbar
     const search = document.getElementById('evidence-search');
     const detSel = document.getElementById('evidence-detector');
     const confSel = document.getElementById('evidence-confidence');
@@ -1320,6 +1345,11 @@
         const prev = cards[(idx - 1 + cards.length) % cards.length];
         if (prev) prev.click();
       }
+    });
+    // Tour overlay: click outside to close
+    var tourOverlay = document.getElementById('tour-overlay');
+    if (tourOverlay) tourOverlay.addEventListener('click', function (e) {
+      if (e.target === tourOverlay) hideTour();
     });
   }
 

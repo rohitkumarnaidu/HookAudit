@@ -1,7 +1,7 @@
 # SECURITY.md — HookAudit Threat Model & Security Posture
 
-**Version:** 0.1.0 — 2026-08-31  
-**Scope:** `bin/hookaudit.js` (zero-dependency, stdlib-only)  
+**Version:** 0.1.0 — 2026-09-01  
+**Scope:** `bin/hookaudit.js` (zero-dependency, stdlib-only, 2357 lines, SHA256 A3C45D82…)  
 **Contact:** See `README.md` / repository Issues for disclosure
 
 ## 1. Threat Model
@@ -10,7 +10,7 @@
 
 HookAudit defends a developer who has just **cloned or pulled an unfamiliar repository** (open-source dependency, contributor fork, take-home assignment, CTF/hackathon submission) and wants to know — *before* opening it in an AI agent or editor — whether that repository contains configuration that will **execute automatically**.
 
-Covered surfaces (11, see `bin/hookaudit.js:47` SURFACES):
+Covered surfaces (12, see `bin/hookaudit.js:63` SURFACES):
 
 ```
 .claude/settings.json      (SessionStart, PreToolUse, PostToolUse, UserPromptSubmit)
@@ -24,6 +24,7 @@ package.json               (preinstall/postinstall/prepare/install/prepublish)
 .husky/*
 .git/hooks/*               (excluding *.sample)
 .pre-commit-config.yaml
+.github/workflows/*.yml    (on: push/pull_request/schedule + run: heuristic — no YAML AST)
 ```
 
 The question HookAudit answers is:
@@ -46,10 +47,10 @@ Allowed: read, parse, hash, normalize, match, resolve, graph, report
 Forbidden: execute, import, require, load plugin, install, build, run
 ```
 
-Verified (`bin/hookaudit.js:31-34`):
+Verified (`bin/hookaudit.js:15-19`):
 
-- Only imports: `node:fs`, `node:path`, `node:crypto`, `node:util` — all `node:` built-ins.
-- No `node:child_process`, no `vm`, no `fetch`/`https` at runtime.
+- Only imports: `node:fs`, `node:path`, `node:crypto`, `node:util`, plus `node:zlib` (try-require, for `branches` without `git` exec) — all `node:` built-ins.
+- No `node:child_process`, no `vm`, no `fetch`/`https` at runtime (detector regex strings contain `curl|fetch|https` as text, not as runtime imports).
 - Target content is read via `fs.readFileSync(p,'utf8')` and inspected as a string/regex/JSON — never `eval`'d, never spawned.
 
 Individual parser failures do **not** crash the scan:
@@ -153,11 +154,11 @@ Unknown is better than invented certainty.
 
 ## 8. What HookAudit Does Not Do
 
-Per `README.md:178` and `LIMITATIONS.md`:
+Per `README.md` and `LIMITATIONS.md`:
 
 - It does not automatically remediate (no deleting hooks, rewriting scripts, disabling tasks, editing `package.json`).
 - It does not sandbox-execute hooks to observe behavior.
-- It scans the **working tree only** today — not every branch (to avoid hidden `git` runtime dependency; git-native `.git/refs` + `node:zlib` walker is a Day-2 stretch).
+- It scans the **working tree by default**. `hookaudit branches` adds local git branch comparison without `git` exec (via `.git/HEAD` + `refs/heads` + `packed-refs` + `node:zlib` inflate, bounded: 5 MiB object, 64-depth, 4096 entries, 64 branches). It does not fetch remotes, clone, or access credentials/server-side history, and reports `UNSUPPORTED_FORMAT` for packed deltas.
 
 ## 9. Reporting & Disclosure
 
@@ -175,16 +176,17 @@ Never claim “Repository is completely safe” from a single tool.
 ## 10. Hardening Checklist (for reviewers)
 
 - [ ] `npm ls --all` → (empty)
-- [ ] `grep -c "require(" bin/hookaudit.js` → 4, all `node:` prefixed
-- [ ] No `child_process`, `vm`, `fetch`, `https` at runtime (grep: 0 hits beyond test file)
+- [ ] `grep -c "require(" bin/hookaudit.js` → 5 (4 core + 1 `node:zlib` try-require), all `node:` prefixed
+- [ ] No `child_process`, `vm`, `fetch`, `https` at runtime (grep: 0 hits beyond test file; detector strings contain `curl|fetch` as text)
 - [ ] `node bin/hookaudit.js scan --path test/fixtures/malicious-repo` flags CRITICAL cross-ref + BLOCK, `paths` shows HIGH risk
 - [ ] `node bin/hookaudit.js scan --path test/fixtures/clean-repo` has 0 CRITICAL, 2 WARN, `decision: REVIEW`
 - [ ] `node bin/hookaudit.js . --json --strict` gates WARN (exit 1) vs `hookaudit . --json` (exit 0)
+- [ ] `node bin/hookaudit.js --sarif --path demo/sample-repository` emits SARIF 2.1.0 with `HOOKAUDIT.<cap>` rules; `--html report.html` self-contained, `escapeHtml` safe
 - [ ] Malformed JSON fixture → `parseError` + `INVALID_JSON` diagnostic, exit 0
 - [ ] `node_modules` fixture → 0 results (never walked via IGNORED_DIRS)
 - [ ] Large file (>1MiB) → `FILE_TOO_LARGE`, binary → `BINARY_SKIPPED`, symlink → `SYMLINK_SKIPPED`, boundary `../` → `BOUNDARY_VIOLATION` no outside read
-- [ ] Multi-hop `config → script A → script B → network` yields `NETWORK_ACCESS` path; cycle `A→B→C→A` → `CYCLE_DETECTED`; dynamic `process.env` → `DYNAMIC_EXECUTION` `LOW`
-- [ ] `npm test` → 22/22 pass (9 original + 13 safety/graph contracts)
-- [ ] Paths in JSON are POSIX (`/`) on Windows and Linux (deterministic, sorted)
-- [ ] Baseline `schemaVersion:2` present, diff shows `NEW_CAPABILITY` semantic
+- [ ] Multi-hop `config → script A → script B → network` yields `NETWORK_ACCESS` path; cycle `A→B→C→A` → `CYCLE_DETECTED`; dynamic `process.env` → `DYNAMIC_EXECUTION` `LOW`; quoted `bash "scripts/a.sh" && bash b.sh` + extensionless `./scripts/a` → `./scripts/a.js`
+- [ ] `npm test` → 87/87 pass (22 core + 49 demo/policy/parity + 16 P2 stretch: SARIF/HTML/shell/GitHub/YAML/TOML/git-branches)
+- [ ] Paths in JSON are POSIX (`/`) on Windows and Linux (deterministic, sorted; `toPosix` via `split(sep).join('/')`)
+- [ ] Baseline `schemaVersion:2` present, diff shows `NEW_CAPABILITY` semantic; `branches` via `node:zlib` without `git` exec
 
