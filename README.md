@@ -7,6 +7,8 @@ commands the moment you open a repository or install its dependencies.
 Track: **E — Security & Crypto Utilities** ("local security scanner" /
 "file integrity tooling").
 
+**Live demo:** [rohitkumarnaidu.github.io/HookAudit](https://rohitkumarnaidu.github.io/HookAudit/) — zero-install browser demo (GH Pages, `file://` compatible) · **Local demo:** [`demo/index.html`](./demo/index.html)
+
 > **One-line pitch:** HookAudit is a **repository execution-topology auditor** — not a generic hook scanner. It answers *What can this repository cause to execute, through which trigger, with which reachable capabilities, and what changed since I trusted it?*
 
 ```mermaid
@@ -198,16 +200,40 @@ sequenceDiagram
 
 ### Try it with zero setup, in a browser
 
-[`demo/index.html`](./demo/index.html) is a self-contained page that
+**Live demo (GitHub Pages): [https://rohitkumarnaidu.github.io/HookAudit/](https://rohitkumarnaidu.github.io/HookAudit/)** — no install, no Node, no server.
+
+[`demo/index.html`](./demo/index.html) + [`index.html`](./index.html) is a self-contained page that
 runs the same detection model (ported, verified byte-identical against
 `demo/sample-repository` for `executionSurfaces/paths/highRiskPaths/decision`
-and `NEW_CAPABILITY`) entirely client-side — no Node, no install, no
-server. Open `file://` or GitHub Pages: pick repo → `scan` → `baseline`
-→ inject simulated PR → `diff`.
+and `NEW_CAPABILITY`) entirely client-side. Open `file://` locally or the
+GH Pages URL above: pick repo → `scan` → `baseline` → inject simulated PR → `diff`.
 
 *Browser demo is an adapter over 5 inert fixtures (`example-attacker.test`
 reserved); real scans run via `node bin/hookaudit.js`. Never `eval`/`fetch`
 at demo time.*
+
+#### GitHub Pages — one-click deploy (no build)
+
+`index.html` is at the repo root, so Pages can serve it with zero config:
+
+```bash
+# Already works via file:// — no server needed:
+# Windows: start index.html
+# macOS:   open index.html
+# Linux:   xdg-open index.html
+# Any:     python -m http.server 8000  # then http://localhost:8000/
+```
+
+**Enable Pages for your fork:**
+
+1. Push to `main` (or your default branch).
+2. GitHub → **Settings → Pages → Build and deployment → Source: Deploy from a branch**.
+3. Select **Branch: `main` / `root`** → **Save**.
+4. Wait ~1 min → your demo is live at `https://<you>.github.io/HookAudit/`.
+
+No bundler, no env vars, no workflow required — three static files (`index.html` + `demo/engine.js` + `demo/demo.js` + `demo/demo.css`) plus `demo/sample-repository`. To validate after deploy: open the Pages URL → **Baseline & Change Demo** → **Save baseline → Simulate change → Compare** → confirm `NEW_CAPABILITY` amber row and the top badge flips to `1`.
+
+> GH Pages is static hosting only — it hosts the *browser demo*. The CLI scanner stays local: `node bin/hookaudit.js . --json`.
 
 ## Tests
 
