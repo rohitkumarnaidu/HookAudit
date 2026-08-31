@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "description": "Minimal local policy layer — zero-dep, stdlib only, honest. Controls CI gate without heuristic overrides. Never silences evidence, only maps severities/risks to BLOCK/REVIEW/PASS.",
+  "blockOn": ["CRITICAL", "HIGH"],
+  "warnOn": ["MEDIUM", "WARN"],
+  "notes": "Evaluated locally in bin/hookaudit.js via node:fs + JSON.parse only. No network, no extra deps. If .hookaudit/policy.json exists it is used; otherwise this demo/policy.json is an example. PASS/REVIEW/BLOCK mapping respects policy but never hides findings.",
+  "defaults": {
+    "blockOn": ["CRITICAL", "HIGH"],
+    "warnOn": ["MEDIUM", "WARN"]
+  }
+}

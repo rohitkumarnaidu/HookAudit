@@ -954,6 +954,67 @@ function resolveExecutionGraph(root, scanResults, globalDiagnostics) {
 const BASELINE_DIR = '.hookaudit';
 const BASELINE_FILE = 'baseline.json';
 const BASELINE_SCHEMA_VERSION = 2;
+const POLICY_FILE = 'policy.json';
+const POLICY_DEFAULT = { version: 1, blockOn: ['CRITICAL', 'HIGH'], warnOn: ['MEDIUM', 'WARN'] };
+
+function policyPath(root) {
+  return path.join(root, BASELINE_DIR, POLICY_FILE);
+}
+
+function loadPolicy(root) {
+  const candidates = [policyPath(root), path.join(root, POLICY_FILE)];
+  for (const p of candidates) {
+    if (!exists(p)) continue;
+    try {
+      const raw = fs.readFileSync(p, 'utf8');
+      if (raw.length > 64 * 1024) continue;
+      const j = JSON.parse(raw);
+      const blockOn = Array.isArray(j.blockOn) ? j.blockOn.filter((x) => typeof x === 'string') : POLICY_DEFAULT.blockOn.slice();
+      const warnOn = Array.isArray(j.warnOn) ? j.warnOn.filter((x) => typeof x === 'string') : POLICY_DEFAULT.warnOn.slice();
+      const version = typeof j.version === 'number' ? j.version : 1;
+      return { version, blockOn, warnOn, source: toPosix(path.relative(root, p)) || p, raw: j };
+    } catch {
+      // invalid JSON -> treat as no policy (honest, don't crash)
+      continue;
+    }
+  }
+  return null;
+}
+
+function evaluatePolicy(policy, summary, results, graph) {
+  if (!policy) return null;
+  const blockOn = new Set(policy.blockOn);
+  const warnOn = new Set(policy.warnOn);
+  const findings = results.flatMap((r) => r.findings);
+  const pathRisks = graph && graph.paths ? graph.paths.map((p) => p.risk) : [];
+  let wouldBlock = false;
+  let wouldReview = false;
+  const reasons = [];
+  for (const f of findings) {
+    if (blockOn.has(f.severity)) { wouldBlock = true; reasons.push(`${f.severity} finding in ${f.sourcePath || f.field || f.trigger}`); }
+    else if (warnOn.has(f.severity)) { wouldReview = true; reasons.push(`${f.severity} warn in ${f.sourcePath || f.field}`); }
+    if (f.pathRisk) {
+      if (blockOn.has(f.pathRisk)) { wouldBlock = true; reasons.push(`pathRisk ${f.pathRisk} in ${f.sourcePath || f.trigger}`); }
+      else if (warnOn.has(f.pathRisk)) { wouldReview = true; }
+    }
+  }
+  for (const r of pathRisks) {
+    if (blockOn.has(r)) { wouldBlock = true; reasons.push(`path risk ${r}`); }
+    else if (warnOn.has(r)) { wouldReview = true; }
+  }
+  if (blockOn.has(summary.decision)) wouldBlock = true;
+  else if (warnOn.has(summary.decision)) wouldReview = true;
+  let decision = 'PASS';
+  if (wouldBlock) decision = 'BLOCK';
+  else if (wouldReview || summary.decision === 'REVIEW' || summary.decision === 'BLOCK') {
+    // preserve REVIEW if baseline had findings but policy didn't block; don't auto-PASS a dirty tree
+    decision = summary.decision === 'BLOCK' && !wouldBlock ? 'REVIEW' : (wouldReview || summary.decision !== 'PASS' ? 'REVIEW' : 'PASS');
+    if (summary.critical === 0 && summary.warn === 0 && pathRisks.filter((x) => x === 'HIGH' || x === 'CRITICAL').length === 0) decision = 'PASS';
+    if (wouldReview) decision = 'REVIEW';
+    if (wouldBlock) decision = 'BLOCK';
+  }
+  return { decision, wouldBlock, wouldReview, reasons: [...new Set(reasons)].slice(0, 8) };
+}
 
 function baselinePath(root) {
   return path.join(root, BASELINE_DIR, BASELINE_FILE);
@@ -1053,7 +1114,7 @@ function colorFor(sev) {
   return 'gray';
 }
 
-function printHuman(results, diff, graph, diagnostics) {
+function printHuman(results, diff, graph, diagnostics, policy, policyEval) {
   const withFindings = results.filter((r) => r.findings.length || r.parseError);
   const allFindings = results.flatMap(r=> r.findings);
   const hasGraph = graph && graph.paths && graph.paths.length;
@@ -1132,11 +1193,17 @@ function printHuman(results, diff, graph, diagnostics) {
   console.log(`Summary: ${styleText('red', String(critical) + ' CRITICAL')}, ${styleText('yellow', String(warn) + ' WARN')}${hasGraph?`, ${highPaths} high-risk path(s)`:''}`);
   if (!critical && !highPaths) console.log(styleText('gray', 'No high-risk execution paths detected in supported/analyzed surfaces.'));
   console.log(styleText('gray', 'Unsupported execution surfaces were not analyzed.'));
+  if (policy) {
+    const col = policyEval && policyEval.decision === 'BLOCK' ? 'red' : policyEval && policyEval.decision === 'REVIEW' ? 'yellow' : 'green';
+    console.log(styleText(col, `Policy: ${policyEval ? policyEval.decision : 'PASS'} (blockOn: ${policy.blockOn.join(', ')})${policyEval && policyEval.reasons.length ? ' — ' + policyEval.reasons.slice(0,2).join('; ') : ''}`));
+    console.log(styleText('gray', `  Policy source: ${policy.source}`));
+  }
 }
 
-function printJson(results, diff, graph, diagnostics, root) {
+function printJson(results, diff, graph, diagnostics, root, policy, policyEval) {
   const allFindings = results.flatMap(r=> r.findings);
   const highRiskPaths = graph ? graph.paths.filter(p=> p.risk==='HIGH'||p.risk==='CRITICAL').length : 0;
+  const baseDecision = highRiskPaths > 0 || allFindings.some(f=> f.severity==='CRITICAL') ? 'BLOCK' : (allFindings.some(f=> f.severity==='WARN') || (diff && diff.changes.length) ? 'REVIEW' : 'PASS');
   const summary = {
     executionSurfaces: results.length,
     withFindings: results.filter(r=> r.findings.length).length,
@@ -1146,7 +1213,8 @@ function printJson(results, diff, graph, diagnostics, root) {
     paths: graph ? graph.paths.length : 0,
     highRiskPaths,
     diagnostics: (diagnostics||[]).length,
-    decision: highRiskPaths > 0 || allFindings.some(f=> f.severity==='CRITICAL') ? 'BLOCK' : (allFindings.some(f=> f.severity==='WARN') || (diff && diff.changes.length) ? 'REVIEW' : 'PASS'),
+    decision: policyEval ? policyEval.decision : baseDecision,
+    baseDecision,
   };
   const surfaces = results.map(r=> ({
     id: `${r.surface}:${r.file}`,
@@ -1172,6 +1240,7 @@ function printJson(results, diff, graph, diagnostics, root) {
     capabilities: [...new Set(allFindings.flatMap(f=> f.capabilities||[]))].sort(),
     diagnostics: diagnostics||[],
     diff,
+    policy: policy ? { source: policy.source, blockOn: policy.blockOn, warnOn: policy.warnOn, evaluated: policyEval } : undefined,
   };
   console.log(JSON.stringify(payload, null, 2));
 }
@@ -1244,18 +1313,30 @@ Execution topology: DISCOVER → NORMALIZE → RESOLVE → GRAPH → INFER → E
   const hasHighPath = graph.paths.some(p=> p.risk==='HIGH'||p.risk==='CRITICAL');
   const strictViolation = values.strict && (anyWarn || anyCritical || hasHighPath);
 
+  // Optional local policy layer (zero-dep, stdlib JSON only) — evaluated but not hidden
+  const policy = loadPolicy(root);
+  // compute summary-like for policy evaluation before final decision
+  const tmpSummary = {
+    critical: results.flatMap(r=> r.findings).filter(f=> f.severity==='CRITICAL').length,
+    warn: results.flatMap(r=> r.findings).filter(f=> f.severity==='WARN').length,
+    decision: hasHighPath || anyCritical ? 'BLOCK' : (anyWarn ? 'REVIEW' : 'PASS'),
+  };
+  const policyEval = policy ? evaluatePolicy(policy, tmpSummary, results, graph) : null;
+  const policyWouldBlock = !!(policyEval && policyEval.decision === 'BLOCK');
+
   // Deterministic global diagnostics sort
   globalDiagnostics.sort((a,b)=> (a.code+a.path).localeCompare(b.code+b.path));
 
   if (command === 'scan') {
-    values.json ? printJson(results, null, graph, globalDiagnostics, root) : printHuman(results, null, graph, globalDiagnostics);
-    process.exitCode = (anyCritical || hasHighPath || strictViolation) ? 1 : 0;
+    values.json ? printJson(results, null, graph, globalDiagnostics, root, policy, policyEval) : printHuman(results, null, graph, globalDiagnostics, policy, policyEval);
+    process.exitCode = (anyCritical || hasHighPath || strictViolation || policyWouldBlock) ? 1 : 0;
   } else if (command === 'baseline') {
     const record = writeBaseline(root, results, graph);
     const relBaseline = toPosix(baselinePath(root));
     const relRoot = toPosix(root);
     const display = relBaseline.startsWith(relRoot) ? relBaseline.slice(relRoot.length + 1) : baselinePath(root);
     console.log(`Baseline written: ${display} (${Object.keys(record.files).length} file(s), id ${record.id}, schema v${record.schemaVersion})`);
+    if (policy) console.log(`Policy active: ${policy.source} blockOn=${policy.blockOn.join(',')}`);
     process.exitCode = 0;
   } else if (command === 'diff') {
     const diff = diffAgainstBaseline(root, results, graph);
@@ -1264,12 +1345,22 @@ Execution topology: DISCOVER → NORMALIZE → RESOLVE → GRAPH → INFER → E
       process.exitCode = 2;
       return;
     }
-    values.json ? printJson(results, diff, graph, globalDiagnostics, root) : printHuman(results, diff, graph, globalDiagnostics);
-    process.exitCode = (anyCritical || hasHighPath || strictViolation || diff.changes.length) ? 1 : 0;
+    values.json ? printJson(results, diff, graph, globalDiagnostics, root, policy, policyEval) : printHuman(results, diff, graph, globalDiagnostics, policy, policyEval);
+    process.exitCode = (anyCritical || hasHighPath || strictViolation || diff.changes.length || policyWouldBlock) ? 1 : 0;
   } else {
     console.error(`Unknown command: ${command}`);
     process.exitCode = 1;
   }
 }
 
-main();
+if (require.main === module) main();
+
+// Export for demo tests (zero-dep, stdlib only)
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    CAPABILITY, DIAGNOSTIC_CODES, SURFACES, RULES, MAX_FILE_SIZE, MAX_GRAPH_DEPTH,
+    parseCommandSpec, inferCapabilities, computeConfidence, computePathRisk,
+    extractScriptReferences, resolveInsideRepository, scan, resolveExecutionGraph,
+    loadPolicy, evaluatePolicy, POLICY_DEFAULT,
+  };
+}

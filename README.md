@@ -180,7 +180,7 @@ node bin/hookaudit.js scan --path demo/sample-repository
 
 ## Zero dependency
 
-`package.json: dependencies:{} devDependencies:{}` `npm ls --all → (empty)` `bin/hookaudit.js` only `node:fs, node:path, node:crypto, node:util` (see `STDLIB.md` 12 substitutions + `deps-proof.txt` `0AD6C16F`). No `child_process` at runtime, no network, no vendoring.
+`package.json: dependencies:{} devDependencies:{}` `npm ls --all → (empty)` `bin/hookaudit.js` only `node:fs, node:path, node:crypto, node:util` (see `STDLIB.md` 12 substitutions + `deps-proof.txt` `0A2ADF75`). No `child_process` at runtime, no network, no vendoring.
 
 ## Security model
 
@@ -209,6 +209,24 @@ node bin/hookaudit.js diff --json --path demo/sample-repository | jq .diff.seman
 ```
 
 See `demo/README.md` for reliability (`run 3× stable, no internet`).
+
+### Browser demo — thin, local, static (P2)
+
+Open `index.html` via `file://` or GitHub Pages — no install, no server, no upload. This is a **browser demonstration adapter** over four synthetic fixtures (same reserved `example-attacker.test`); it uses a browser port of the same normalized surface model, trigger & `CommandSpec`, capability `RULES`, and graph concepts as the CLI — not the Node binary itself — so numbers are illustrative but structurally mirror the CLI. Real scans run with `node bin/hookaudit.js` (proven via `demo/sample-repository` producing the same `executionSurfaces/paths/highRiskPaths/decision` and `NEW_CAPABILITY` signal).
+
+P2 thin dashboard (priority 1–3 only, per spec §101):
+
+- **Dashboard — execution topology at a glance** (thin, local, static — not a cloud SaaS, no fake charts): six metrics derived live from `HookAuditEngine.analyzeRepo()` — `executionSurfaces / paths / highRiskPaths / capabilities / newSinceBaseline (real NEW_CAPABILITY) / unresolved (UNRESOLVED+BOUNDARY+DYNAMIC+CYCLE)` — each clickable and traceable to its source section (file exhibit / paths / baseline diff / diagnostics). See `docs/demo/README.md` §4.
+
+- **Interactive execution graph** (SVG, derived from `analysis.graph` nodes/edges/paths, not a mock): deterministic BFS-layered layout, keyboard-navigable, filterable (`All / High-risk only / Network`), click/Enter to inspect node evidence + reachable paths + file trace. See `docs/demo/README.md` §4.1.
+
+- **Capability diff visualization**: matrix `baseline.capabilitySummary` vs current reachable capabilities highlighting **NEW_CAPABILITY** with evidence, plus heatmap bar — the honest `NEW_CAPABILITY` signal even when heuristic score is low. See `docs/demo/README.md` §4.2.
+
+- **Richer evidence explorer**: search + detector/confidence/file filters, `filtered/total` count, clickable rows that highlight and scroll to the source file in the exhibit, `Copy JSON` (local). See `docs/demo/README.md` §4.3.
+
+Deployment: `file:///.../HookAudit/index.html` works offline; for GitHub Pages enable **Settings → Pages → Source: Deploy from branch → main / root** — no build, no bundler. Full architecture, fixture table, recording script, deployment and limitations: `docs/demo/README.md` (spec §54).
+
+Security note (browser): never `eval`s fixture code, never `spawn`s, never `fetch`es fixture URLs — all analysis is static text inspection in memory. Inert placeholders use `example-attacker.test`.
 
 ## CLI
 
@@ -259,7 +277,7 @@ node bin/hookaudit.js diff --json --path demo/sample-repository | jq .diff.seman
 npm test
 ```
 
-22 tests in `test/hookaudit.test.js`, run as black-box subprocess tests via `node:test` + `node:child_process` against the actual CLI:
+71 tests (`22` core in `test/hookaudit.test.js` + `49` demo/policy/parity in `test/demo.test.js`), run via `node:test` (+ `node:child_process` for black-box CLI):
 
 - clean-repo has no CRITICAL (exit 0), malicious-pattern is CRITICAL (exit 1), cross-reference and runtime-bootstrap fire, obfuscation flagged, `node_modules` never walked, malformed JSON → `parseError` diagnostic not crash
 - baseline/diff: no drift on unchanged, `CHANGED` on modified, `NEW_CAPABILITY` semantic diff (`NETWORK_ACCESS` after `curl` edit)

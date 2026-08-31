@@ -17,7 +17,7 @@ $ cat package.json
     "node": ">=24.0.0"
   },
   "scripts": {
-    "test": "node --test test/hookaudit.test.js"
+    "test": "node --test test/hookaudit.test.js test/demo.test.js"
   },
   "dependencies": {},
   "devDependencies": {}
@@ -38,18 +38,18 @@ $ grep runtime imports (no child_process, vm, fetch, https, http, net at runtime
 # Verified: Select-String "child_process|vm|fetch|https" in bin/hookaudit.js shows 0 runtime imports, only capability names/detector strings
 
 
-bin/hookaudit.js SHA256: 0AD6C16F31887E7DA17BCBE41CAFC9DDC33FC3D125260E7546E696FBAD73B744
-Generated: 2026-08-31T21:30:00Z on Windows with node v24.19.0 (make optional, npm test is cross-platform one-command)
+bin/hookaudit.js SHA256: 0A2ADF753E0E66CF4079AE0758EE302368881D84C63A4DF334AE0F80598348DF
+Generated: 2026-08-31T23:55:00Z on Windows with node v24.19.0 (make optional, npm test is cross-platform one-command)
 POSIX paths: YES (toPosix via split(sep).join('/'))
 Deterministic: YES (sorted entries/files/findings/changes/nodes/edges/paths, lexicographic)
 Engines: >=24.0.0
-Tests: 22/22 pass (9 original + 13 safety/graph/determinism/strict/multi-hop/cycle/dynamic/symlink/capability-diff)
+Tests: 71/71 pass (22 core + 49 demo/policy/parity, node:test)
 Graph: YES (nodes REPOSITORY/CONFIG/TRIGGER/COMMAND/SCRIPT/FILE/CAPABILITY, edges CONTAINS/TRIGGERS/EXECUTES/REFERENCES/CONNECTS_TO)
-Resolver: YES (config->script multi-hop, boundary/symlink/cycle/depth/dynamic, visited+MAX_GRAPH_DEPTH=32, filtered // and -s noise)
-Capabilities: YES (P0/P1/P2 enum, evidence per finding, confidence HIGH/MED/LOW)
+Resolver: YES (config->script multi-hop, boundary/symlink/cycle/depth/dynamic, visited+MAX_GRAPH_DEPTH=32)
+Capabilities: YES (P0/P1/P2 11-enum, evidence per finding, confidence HIGH/MED/LOW)
 Risk: YES (unified path-based, HIGH/CRITICAL per trigger+capabilities)
-Baseline: schemaVersion 2, semantic diff NEW_TRIGGER/NEW_CAPABILITY etc.
+Baseline: schemaVersion 2, semantic diff NEW_TRIGGER/NEW_CAPABILITY etc., policy JSON blockOn
 Zero deps: YES (dependencies={}, devDependencies={}, npm ls empty)
 Target execution: NONE (read/parse/hash only, never-execute test passes)
-Demo: YES (demo/sample-repository 3 surfaces, 4 paths, BLOCK, 5 capabilities, deterministic)
+Demo: YES (index.html + demo/engine.js + demo/demo.js + demo/dashboard.js + demo/policy.json, 5 fixtures, honest Honest Browser Adapter, static)
 One-command: YES (node bin/hookaudit.js --help | npm test | make test on Unix)
