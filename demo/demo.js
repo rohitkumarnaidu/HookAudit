@@ -205,28 +205,45 @@
   function getFixture(id) { return FIXTURES.find(function (f) { return f.id === id; }); }
   function cloneFiles(map) { const out = {}; Object.keys(map).forEach(function (k) { out[k] = map[k]; }); return out; }
 
-  // Workflow steps — enterprise guided journey 01-05
+  // Workflow steps — enterprise guided journey 01-05 — dynamic progress tied to analysis/baseline/diff
   function updateWorkflowSteps() {
     var steps = document.querySelectorAll('.steps-bar .step');
+    // keep is-current (nav selection) — only reset workflow classes
     steps.forEach(function (s) { s.classList.remove('is-active', 'is-done'); var dot = s.querySelector('.step-dot'); if (dot) dot.textContent = ''; });
-    var d = document.querySelector('.steps-bar [data-step="discover"]');
-    var det = document.querySelector('.steps-bar [data-step="detect"]');
-    var t = document.querySelector('.steps-bar [data-step="trace"]');
-    var an = document.querySelector('.steps-bar [data-step="analyze"]');
-    var w = document.querySelector('.steps-bar [data-step="watch"]');
-    if (!analysis) { if (d) d.classList.add('is-active'); return; }
-    if (d) { d.classList.add('is-done'); var dd = d.querySelector('.step-dot'); if (dd) dd.textContent = '\u2713'; }
-    if (det) det.classList.add('is-active');
-    if (t) t.classList.add('is-active');
-    if (an) an.classList.add('is-active');
-    if (baselineRecord) {
-      if (det) { det.classList.add('is-done'); var detDot = det.querySelector('.step-dot'); if (detDot) detDot.textContent = '\u2713'; }
-      if (t) { t.classList.add('is-done'); var tDot = t.querySelector('.step-dot'); if (tDot) tDot.textContent = '\u2713'; }
-      if (an) { an.classList.add('is-done'); var anDot = an.querySelector('.step-dot'); if (anDot) anDot.textContent = '\u2713'; }
-      if (w) { w.classList.add('is-active'); var wDot = w.querySelector('.step-dot'); if (wDot) wDot.textContent = '\u25CF'; }
+    var map = {
+      discover: document.querySelector('.steps-bar [data-step="discover"]'),
+      detect: document.querySelector('.steps-bar [data-step="detect"]'),
+      trace: document.querySelector('.steps-bar [data-step="trace"]'),
+      analyze: document.querySelector('.steps-bar [data-step="analyze"]'),
+      watch: document.querySelector('.steps-bar [data-step="watch"]')
+    };
+    function markDone(key) {
+      var el = map[key]; if (!el) return;
+      el.classList.remove('is-active'); el.classList.add('is-done');
+      var dot = el.querySelector('.step-dot'); if (dot) dot.textContent = '\u2713';
+    }
+    function markActive(key) {
+      var el = map[key]; if (!el) return;
+      el.classList.remove('is-done'); el.classList.add('is-active');
+      var dot = el.querySelector('.step-dot'); if (dot) dot.textContent = '\u25CF';
+    }
+    if (!analysis) {
+      markActive('discover');
+      return;
+    }
+    // After scan: 01-04 done, 05 WATCH is next (active) — shows real progress, not 3 actives
+    markDone('discover'); markDone('detect'); markDone('trace'); markDone('analyze');
+    if (!baselineRecord) {
+      markActive('watch');
+      return;
+    }
+    if (baselineRecord && !diffResult) {
+      // baseline saved — WATCH stays active (awaiting diff)
+      markActive('watch');
+      return;
     }
     if (baselineRecord && diffResult) {
-      if (w) { w.classList.add('is-done'); var wDot2 = w.querySelector('.step-dot'); if (wDot2) wDot2.textContent = '\u2713'; }
+      markDone('watch');
     }
   }
 
@@ -1064,6 +1081,8 @@
     renderZeroDepPanel();
     syncAdvancedPanels();
     updateWorkflowSteps();
+    // keep nav focus ring (is-current) in sync without hiding — workflow colors stay from updateWorkflowSteps
+    (function(){ var cur=currentStep; document.querySelectorAll('.steps-bar .step').forEach(function(s){ var isSel=s.getAttribute('data-step')===cur; s.classList.toggle('is-current', isSel); s.setAttribute('aria-current', isSel?'step':'false'); }); })();
     // P2: thin dashboard + interactive graph (derived from live analysis.graph)
     if (window.HookAuditDashboard) {
       try {
@@ -1236,9 +1255,12 @@
     document.querySelectorAll('.step-content').forEach(function (s) { s.style.display = 'none'; });
     var showId = STEP_CONTENT_MAP[step];
     var show = showId ? document.getElementById(showId) : null;
-    if (show) show.style.display = '';
+    if (show) { show.style.display = ''; show.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); }
+    // nav selection uses is-current — does NOT clobber is-done/is-active workflow colors
     document.querySelectorAll('.steps-bar .step').forEach(function (s) {
-      s.classList.toggle('is-active', s.getAttribute('data-step') === step);
+      var isSel = s.getAttribute('data-step') === step;
+      s.classList.toggle('is-current', isSel);
+      s.setAttribute('aria-current', isSel ? 'step' : 'false');
     });
   }
 
