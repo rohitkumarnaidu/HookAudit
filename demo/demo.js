@@ -1317,6 +1317,9 @@
         navigateStep(step.getAttribute('data-step'));
       });
     });
+    document.querySelectorAll('.how-go').forEach(function (b) {
+      b.addEventListener('click', function () { navigateStep(b.getAttribute('data-step')); });
+    });
     // Tour
     var tourBtn = document.getElementById('btn-tour');
     if (tourBtn) tourBtn.addEventListener('click', showTour);

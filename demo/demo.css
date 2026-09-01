@@ -194,8 +194,22 @@ h4,.h4{font-size:14px;font-weight:600;line-height:1.4}
 .step.is-current{border-color:var(--focus);box-shadow:0 0 0 3px rgba(25,113,194,.18)}
 .step.is-current .step-num{border-color:var(--focus)}
 
+/* How it works — storytelling */
+.how-it-works{margin-top:var(--sp-2)}
+.how-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--sp-3)}
+.how-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-2)}
+.how-num{width:32px;height:32px;border-radius:50%;background:var(--ink);color:var(--surface);display:grid;place-items:center;font-weight:800;font-size:12px;font-family:var(--mono);flex-shrink:0}
+.how-card h3{margin:0;font-size:14px;line-height:1.3}
+.how-card h3 span{font-weight:600;color:var(--ink-secondary);font-size:13px}
+.how-story{margin:0;color:var(--ink-secondary);font-size:13px;line-height:1.6}
+.how-example{margin-top:2px;display:flex;gap:var(--sp-2);align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--surface-subtle);border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px;font-family:var(--mono);font-size:11px}
+.how-example span{font-family:var(--sans);font-weight:700;font-size:11px;color:var(--ink);background:var(--surface);border:1px solid var(--border);padding:2px 8px;border-radius:999px;white-space:nowrap}
+.how-see{font-size:12px;color:var(--ink-muted);line-height:1.5}
+.how-go{align-self:flex-start;margin-top:auto}
+@media(max-width:640px){.how-grid{grid-template-columns:1fr}}
+
 /* ═══════════════════════════════════════════
-   8. DEMO BANNER
+    8. DEMO BANNER
    ═══════════════════════════════════════════ */
 .demo-banner{margin:var(--sp-3) 0;padding:var(--sp-3) var(--sp-4);background:var(--info-bg);border:1px solid var(--info-border);border-radius:var(--r-md);display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);flex-wrap:wrap;font-size:13px;color:var(--ink-secondary)}
 .demo-badge{background:var(--info);color:#fff;padding:2px 8px;border-radius:var(--r-pill);font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}

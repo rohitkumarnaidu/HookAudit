@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HookAudit — Repository Execution-Topology Auditor</title>
 <meta name="description" content="HookAudit interactive browser demonstration using the HookAudit execution model and controlled inert fixtures. Real repository scans run through the Node.js CLI.">
-<link rel="stylesheet" href="demo/demo.css?v=select-ring-single">
+<link rel="stylesheet" href="demo/demo.css?v=how-story">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
@@ -97,6 +97,58 @@
         <span class="step-dot" aria-hidden="true"></span>
       </button>
     </nav>
+
+    <!-- How it works — storytelling -->
+    <section class="section how-it-works" aria-labelledby="how-heading">
+      <div class="section-head">
+        <h2 id="how-heading">How it works — story</h2>
+        <span class="hint">If you have this, do that — 5 steps, zero jargon</span>
+      </div>
+      <p class="micro" style="margin:0 0 var(--sp-4);color:var(--ink-secondary)">A repo is a promise that some files will run for you. HookAudit tells you which ones, when they fire, what they can reach, and what changed since you trusted it. Follow the story.</p>
+      <div class="how-grid">
+        <article class="how-card">
+          <div class="how-num">01</div>
+          <h3>DISCOVER — <span>Find where code can hide</span></h3>
+          <p class="how-story"><strong>If you just cloned a repo</strong> and wonder “where could it run?” → we scan 12 surfaces (`.claude/settings.json`, `.vscode/tasks.json`, `package.json` preinstall, etc.). No guess, just file globs.</p>
+          <div class="how-example"><code>.vscode/tasks.json → runOn: folderOpen</code> <span>Surface found</span></div>
+          <div class="how-see">You see: <code>3 surfaces</code> in Execution surfaces — click to open the file.</div>
+          <button class="btn btn-ghost btn-sm how-go" data-step="discover" type="button">Go to DISCOVER →</button>
+        </article>
+        <article class="how-card">
+          <div class="how-num">02</div>
+          <h3>DETECT — <span>Does it run on its own?</span></h3>
+          <p class="how-story"><strong>If a surface has `curl … | bash` or `SessionStart`</strong> → we mark it <em>automatic</em> (no click needed). Manual `npm test` stays `LOW`.</p>
+          <div class="how-example"><code>SessionStart → node .vscode/setup.mjs</code> <span>Automatic ★</span></div>
+          <div class="how-see">You see: trigger badge + confidence <code>HIGH</code>.</div>
+          <button class="btn btn-ghost btn-sm how-go" data-step="detect" type="button">Go to DETECT →</button>
+        </article>
+        <article class="how-card">
+          <div class="how-num">03</div>
+          <h3>TRACE — <span>Follow the hop</span></h3>
+          <p class="how-story"><strong>If a hook runs `node scripts/a.js` and `a.js` does `require("./b.js")`</strong> → we follow 2 hops to `b.js → fetch(https://…)`. No execution, just static text.</p>
+          <div class="how-example"><code>Hook → a.js → b.js → NETWORK</code> <span>2 hops</span></div>
+          <div class="how-see">You see: chain <code>.claude/settings.json → cmd → scripts/b.js → NETWORK</code>.</div>
+          <button class="btn btn-ghost btn-sm how-go" data-step="trace" type="button">Go to TRACE →</button>
+        </article>
+        <article class="how-card">
+          <div class="how-num">04</div>
+          <h3>ANALYZE — <span>What can it do?</span></h3>
+          <p class="how-story"><strong>If the chain reaches network + process + obfuscation</strong> → we tag `REMOTE_DOWNLOAD, RUNTIME_BOOTSTRAP` and score <code>CRITICAL</code>. Risk ≠ malware, just evidence.</p>
+          <div class="how-example"><code>automatic + remote + process + obfuscation → CRITICAL</code></div>
+          <div class="how-see">You see: capability chips + <code>Why this matters</code>.</div>
+          <button class="btn btn-ghost btn-sm how-go" data-step="analyze" type="button">Go to ANALYZE →</button>
+        </article>
+        <article class="how-card">
+          <div class="how-num">05</div>
+          <h3>WATCH — <span>Did it change since you trusted it?</span></h3>
+          <p class="how-story"><strong>If you saved a baseline yesterday</strong> and today `scripts/b.js` adds `fetch` → we show <code>CHANGED + NEW_CAPABILITY NETWORK_ACCESS</code>. Not “safe”, just “what you trusted vs now”.</p>
+          <div class="how-example"><code>Save baseline → Simulate change → Compare</code> <span>Try it</span></div>
+          <div class="how-see">You see: File drift + Semantic chips + Capability diff table.</div>
+          <button class="btn btn-ghost btn-sm how-go" data-step="watch" type="button">Go to WATCH →</button>
+        </article>
+      </div>
+      <p class="micro" style="margin-top:var(--sp-4)">Tip: Click any pill above or any “Go to →” to jump. Or start with <button class="btn btn-sm" onclick="document.getElementById('repo-grid')?.scrollIntoView({behavior:'smooth'})" type="button">Choose a fixture</button> then <code>Save baseline → Simulate change → Compare</code>.</p>
+    </section>
 
     <!-- Repository Selector -->
     <section class="section" aria-labelledby="repo-heading">
@@ -543,8 +595,8 @@ node bin/hookaudit.js --help</code></div>
   </div>
 </div>
 
-<script src="demo/engine.js?v=select-ring-single"></script>
-<script src="demo/dashboard.js?v=select-ring-single"></script>
-<script src="demo/demo.js?v=select-ring-single"></script>
+<script src="demo/engine.js?v=how-story"></script>
+<script src="demo/dashboard.js?v=how-story"></script>
+<script src="demo/demo.js?v=how-story"></script>
 </body>
 </html>
