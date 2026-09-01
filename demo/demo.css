@@ -190,8 +190,10 @@ h4,.h4{font-size:14px;font-weight:600;line-height:1.4}
 .step-dot{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0}
 .step.is-active .step-dot{background:var(--surface)}
 .step.is-done .step-dot{background:var(--success)}
-.step.is-current{outline:2px solid var(--focus);outline-offset:2px;box-shadow:0 0 0 4px var(--focus-ring)}
-.step.is-current .step-num{border-color:var(--focus)}
+.step.is-current{border-color:var(--ink);background:var(--ink);color:var(--surface);font-weight:600;outline:2px solid var(--focus);outline-offset:2px;box-shadow:0 0 0 4px var(--focus-ring)}
+.step.is-current .step-num{background:var(--surface);color:var(--ink);border-color:var(--surface)}
+.step.is-current .step-label span{color:rgba(255,255,255,.7)}
+.step.is-current .step-dot{background:var(--surface)}
 
 /* ═══════════════════════════════════════════
    8. DEMO BANNER

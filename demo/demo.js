@@ -231,20 +231,12 @@
       markActive('discover');
       return;
     }
-    // After scan: 01-04 done, 05 WATCH is next (active) — shows real progress, not 3 actives
+    // After scan: 01-04 done (green), 05 WATCH stays neutral grey until diff — selection (is-current) provides black highlight, not stuck
     markDone('discover'); markDone('detect'); markDone('trace'); markDone('analyze');
-    if (!baselineRecord) {
-      markActive('watch');
-      return;
-    }
-    if (baselineRecord && !diffResult) {
-      // baseline saved — WATCH stays active (awaiting diff)
-      markActive('watch');
-      return;
-    }
     if (baselineRecord && diffResult) {
       markDone('watch');
     }
+    // else WATCH remains inactive (grey) — prevents last always black
   }
 
   function renderSelectedPath() {
