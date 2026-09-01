@@ -4,599 +4,481 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>HookAudit — Repository Execution-Topology Auditor</title>
-<meta name="description" content="HookAudit interactive browser demonstration using the HookAudit execution model and controlled inert fixtures. Real repository scans run through the Node.js CLI.">
-<link rel="stylesheet" href="demo/demo.css?v=how-story">
+<meta name="description" content="HookAudit interactive browser workspace using the HookAudit execution model and client-side static analysis. Real repository scans run through the Node.js CLI.">
+<link rel="stylesheet" href="demo/demo.css?v=light-theme-v1">
 </head>
 <body>
-<a class="skip-link" href="#main">Skip to main content</a>
+<a class="skip-link" href="#workspace-app">Skip to workspace</a>
 
+<!-- ═══════════════════════════════════════════
+     1. TOP APPLICATION BAR
+     ═══════════════════════════════════════════ -->
 <header class="site-header" role="banner">
   <div class="shell header-inner">
-    <div class="brand">
+    <div class="brand" id="brand-home" title="HookAudit Home" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
       <div class="brand-icon" aria-hidden="true">HA</div>
       <div class="brand-text">
         <h1>HOOKAUDIT</h1>
-        <p>Repository Execution-Topology Auditor</p>
+        <p>Repository Execution-Topology Workspace</p>
       </div>
     </div>
-    <nav class="page-nav" role="navigation" aria-label="Pages">
-      <button class="page-tab is-active" data-page="product-story" type="button">Product Story</button>
-      <button class="page-tab" data-page="architecture" type="button">Core Architecture</button>
-    </nav>
+
+    <!-- Live Decision Status Pill -->
+    <div class="header-center">
+      <div id="header-decision-badge" class="header-decision-badge decision-pass">
+        <span id="header-decision-text">PASS</span>
+      </div>
+      <div class="badge" style="font-size:10px;padding:2px 8px;background:var(--info-bg);color:var(--info);border-color:var(--info-border)">ZERO-DEP</div>
+      <span style="display:none">Honest scope — never executes fixture code — Interactive browser demonstration</span>
+    </div>
+
     <div class="header-actions">
-      <button id="btn-tour" class="btn btn-sm" type="button" aria-label="Start guided tour">Tour</button>
+      <button id="btn-quick-scan" class="btn btn-sm btn-primary" type="button">Run Audit</button>
+      <button id="btn-export-json" class="btn btn-sm btn-subtle" type="button" title="Export JSON v1">JSON</button>
+      <button id="btn-export-sarif" class="btn btn-sm btn-subtle" type="button" title="Export SARIF 2.1.0">SARIF</button>
+      <button id="btn-export-html" class="btn btn-sm btn-subtle" type="button" title="Export Self-Contained HTML">HTML</button>
+      <button id="btn-tour" class="btn btn-sm btn-subtle" type="button" aria-label="Start guided tour">Interactive Tour</button>
       <a class="btn btn-sm btn-ghost" href="https://github.com/rohitkumarnaidu/HookAudit" rel="noopener" target="_blank">Source</a>
-      <button id="btn-reset-header" class="btn btn-sm btn-subtle" type="button" aria-label="Reset demo to initial state">Reset</button>
+      <button id="btn-reset-header" class="btn btn-sm btn-ghost" type="button" aria-label="Reset workspace">Reset</button>
     </div>
   </div>
 </header>
 
-<main id="main" class="shell" role="main">
+<!-- ═══════════════════════════════════════════
+     2. INTRODUCTION, HOW IT WORKS & QUICKSTART
+     ═══════════════════════════════════════════ -->
+<section class="intro-section" aria-labelledby="intro-heading">
+  <div class="shell intro-hero">
+    <div class="intro-badge">⚡ Zero-Dependency Static Execution Auditor</div>
+    <h2 id="intro-heading" class="intro-title">See what a repository can execute before you trust or open it.</h2>
+    <p class="intro-subtitle">
+      Developer configs like <code>.vscode/tasks.json</code> (runOn: folderOpen), <code>.claude/settings.json</code> (SessionStart), and npm <code>preinstall</code> can trigger automatic execution, network downloads, and shell payloads without confirmation. HookAudit parses and traces execution chains statically in pure JavaScript with <strong>0 dependencies and 0 server uploads</strong>.
+    </p>
 
-  <!-- ═══════════════════════════════════════════
-       PAGE 1: PRODUCT STORY
-       ═══════════════════════════════════════════ -->
-  <div id="page-product-story" class="page-view">
-
-    <!-- Hero -->
-    <section class="hero" aria-labelledby="hero-heading">
-      <p class="text-mono text-faint text-sm" style="letter-spacing:.08em;text-transform:uppercase">Evidence-driven repository auditing</p>
-      <h2 id="hero-heading" class="display" style="margin:var(--sp-2) 0 var(--sp-3)">See what a repo can execute before you trust it.</h2>
-      <p class="hero-sub">Zero-dependency static analysis surfaces execution triggers, traces multi-hop paths, and maps capabilities with explainable evidence.</p>
-      <div class="hero-actions">
-        <button id="btn-start-scan" class="btn btn-primary" type="button">Start scan</button>
-        <button id="btn-about-demo-hero" class="btn btn-subtle" type="button">How this demo works</button>
-      </div>
-    </section>
-
-    <!-- Demo banner -->
-    <div class="demo-banner" role="note" aria-label="Demo mode">
-      <div class="flex items-center gap-2">
-        <span class="demo-badge">DEMO</span>
-        <span><strong>Controlled inert fixtures</strong> &middot; Real scans run via <code>node bin/hookaudit.js</code></span>
-        <span style="display:none">Honest scope — never executes fixture code — Interactive browser demonstration</span>
-      </div>
-      <button class="btn btn-sm btn-ghost" type="button" id="btn-about-demo" aria-expanded="false" aria-controls="about-demo-panel">About</button>
-    </div>
-    <div class="panel" id="about-demo-panel" hidden style="margin-bottom:var(--sp-4)">
-      <div class="panel-body">
-        <p style="margin:0"><strong>Browser adapter, not the Node binary.</strong> Interactive demonstration using the HookAudit execution model and controlled inert fixtures. All analysis is static text inspection in memory &mdash; never <code>eval</code>s fixture code, never spawns processes, never fetches remote URLs.</p>
-        <ul style="margin:var(--sp-2) 0 0;padding-left:var(--sp-5);font-size:13px;color:var(--ink-secondary)">
-          <li><strong>Real scans</strong> run with <code>node bin/hookaudit.js . --json</code> on your filesystem.</li>
-          <li><strong>Fixtures are inert</strong> and deterministic &mdash; selecting a file never executes it.</li>
-          <li><strong>No uploads, no network, no install</strong> &mdash; works via <code>file://</code> or GitHub Pages.</li>
-        </ul>
-      </div>
+    <div class="intro-actions">
+      <button id="btn-hero-tour" class="btn btn-primary" type="button" style="padding:10px 20px;font-size:14px">
+        🚀 Take Interactive Tour
+      </button>
+      <button id="btn-jump-workspace" class="btn btn-subtle" type="button" style="padding:10px 20px;font-size:14px" onclick="document.getElementById('workspace-app').scrollIntoView({behavior:'smooth'})">
+        📊 Jump to Workspace
+      </button>
     </div>
 
-    <!-- 5-Step Workflow -->
-    <nav class="steps-bar" role="navigation" aria-label="Workflow steps">
-      <button class="step is-active" data-step="discover" type="button">
-        <span class="step-num">01</span>
-        <span class="step-label"><strong>DISCOVER</strong><span>Find execution surfaces</span></span>
-        <span class="step-dot" aria-hidden="true"></span>
-      </button>
-      <button class="step" data-step="detect" type="button">
-        <span class="step-num">02</span>
-        <span class="step-label"><strong>DETECT</strong><span>Identify automatic execution</span></span>
-        <span class="step-dot" aria-hidden="true"></span>
-      </button>
-      <button class="step" data-step="trace" type="button">
-        <span class="step-num">03</span>
-        <span class="step-label"><strong>TRACE</strong><span>Resolve multi-hop references</span></span>
-        <span class="step-dot" aria-hidden="true"></span>
-      </button>
-      <button class="step" data-step="analyze" type="button">
-        <span class="step-num">04</span>
-        <span class="step-label"><strong>ANALYZE</strong><span>Map capabilities &amp; risk</span></span>
-        <span class="step-dot" aria-hidden="true"></span>
-      </button>
-      <button class="step" data-step="watch" type="button">
-        <span class="step-num">05</span>
-        <span class="step-label"><strong>WATCH</strong><span>Detect execution changes</span></span>
-        <span class="step-dot" aria-hidden="true"></span>
-      </button>
-    </nav>
-
-    <!-- How it works — storytelling -->
-    <section class="section how-it-works" aria-labelledby="how-heading">
-      <div class="section-head">
-        <h2 id="how-heading">How it works — story</h2>
-        <span class="hint">If you have this, do that — 5 steps, zero jargon</span>
+    <!-- 3 Quickstart Guide Cards: How to use -->
+    <div class="quickstart-grid">
+      <div class="quickstart-card">
+        <div class="quickstart-num">1</div>
+        <h3>Pick or Drop a Repository</h3>
+        <p>Select any of the 5 canonical live fixtures on the left, or drag-and-drop your own local folder to audit in-browser.</p>
       </div>
-      <p class="micro" style="margin:0 0 var(--sp-4);color:var(--ink-secondary)">A repo is a promise that some files will run for you. HookAudit tells you which ones, when they fire, what they can reach, and what changed since you trusted it. Follow the story.</p>
-      <div class="how-grid">
-        <article class="how-card">
-          <div class="how-num">01</div>
-          <h3>DISCOVER — <span>Find where code can hide</span></h3>
-          <p class="how-story"><strong>If you just cloned a repo</strong> and wonder “where could it run?” → we scan 12 surfaces (`.claude/settings.json`, `.vscode/tasks.json`, `package.json` preinstall, etc.). No guess, just file globs.</p>
-          <div class="how-example"><code>.vscode/tasks.json → runOn: folderOpen</code> <span>Surface found</span></div>
-          <div class="how-see">You see: <code>3 surfaces</code> in Execution surfaces — click to open the file.</div>
-          <button class="btn btn-ghost btn-sm how-go" data-step="discover" type="button">Go to DISCOVER →</button>
-        </article>
-        <article class="how-card">
-          <div class="how-num">02</div>
-          <h3>DETECT — <span>Does it run on its own?</span></h3>
-          <p class="how-story"><strong>If a surface has `curl … | bash` or `SessionStart`</strong> → we mark it <em>automatic</em> (no click needed). Manual `npm test` stays `LOW`.</p>
-          <div class="how-example"><code>SessionStart → node .vscode/setup.mjs</code> <span>Automatic ★</span></div>
-          <div class="how-see">You see: trigger badge + confidence <code>HIGH</code>.</div>
-          <button class="btn btn-ghost btn-sm how-go" data-step="detect" type="button">Go to DETECT →</button>
-        </article>
-        <article class="how-card">
-          <div class="how-num">03</div>
-          <h3>TRACE — <span>Follow the hop</span></h3>
-          <p class="how-story"><strong>If a hook runs `node scripts/a.js` and `a.js` does `require("./b.js")`</strong> → we follow 2 hops to `b.js → fetch(https://…)`. No execution, just static text.</p>
-          <div class="how-example"><code>Hook → a.js → b.js → NETWORK</code> <span>2 hops</span></div>
-          <div class="how-see">You see: chain <code>.claude/settings.json → cmd → scripts/b.js → NETWORK</code>.</div>
-          <button class="btn btn-ghost btn-sm how-go" data-step="trace" type="button">Go to TRACE →</button>
-        </article>
-        <article class="how-card">
-          <div class="how-num">04</div>
-          <h3>ANALYZE — <span>What can it do?</span></h3>
-          <p class="how-story"><strong>If the chain reaches network + process + obfuscation</strong> → we tag `REMOTE_DOWNLOAD, RUNTIME_BOOTSTRAP` and score <code>CRITICAL</code>. Risk ≠ malware, just evidence.</p>
-          <div class="how-example"><code>automatic + remote + process + obfuscation → CRITICAL</code></div>
-          <div class="how-see">You see: capability chips + <code>Why this matters</code>.</div>
-          <button class="btn btn-ghost btn-sm how-go" data-step="analyze" type="button">Go to ANALYZE →</button>
-        </article>
-        <article class="how-card">
-          <div class="how-num">05</div>
-          <h3>WATCH — <span>Did it change since you trusted it?</span></h3>
-          <p class="how-story"><strong>If you saved a baseline yesterday</strong> and today `scripts/b.js` adds `fetch` → we show <code>CHANGED + NEW_CAPABILITY NETWORK_ACCESS</code>. Not “safe”, just “what you trusted vs now”.</p>
-          <div class="how-example"><code>Save baseline → Simulate change → Compare</code> <span>Try it</span></div>
-          <div class="how-see">You see: File drift + Semantic chips + Capability diff table.</div>
-          <button class="btn btn-ghost btn-sm how-go" data-step="watch" type="button">Go to WATCH →</button>
-        </article>
+      <div class="quickstart-card">
+        <div class="quickstart-num">2</div>
+        <h3>Inspect Topology &amp; Hops</h3>
+        <p>Pan &amp; zoom through the interactive SVG execution canvas. Follow multi-hop links from config trigger to network payload.</p>
       </div>
-      <p class="micro" style="margin-top:var(--sp-4)">Tip: Click any pill above or any “Go to →” to jump. Or start with <button class="btn btn-sm" onclick="document.getElementById('repo-grid')?.scrollIntoView({behavior:'smooth'})" type="button">Choose a fixture</button> then <code>Save baseline → Simulate change → Compare</code>.</p>
-    </section>
-
-    <!-- Repository Selector -->
-    <section class="section" aria-labelledby="repo-heading">
-      <div class="section-head">
-        <h2 id="repo-heading">Repository</h2>
-        <span class="hint">Select a fixture to begin &middot; controlled inert &middot; zero dependency</span>
+      <div class="quickstart-card">
+        <div class="quickstart-num">3</div>
+        <h3>Watch Drift &amp; Inline Diff</h3>
+        <p>Save a trusted baseline, simulate changes, and view line-by-line syntax diffs when new capabilities are introduced.</p>
       </div>
-      <div id="repo-grid" class="repo-grid" role="listbox" aria-label="Repository fixtures"></div>
-      <p class="micro">Selecting a fixture never executes it. <span class="kbd">example-attacker.test</span> is RFC 2606 reserved.</p>
-    </section>
-
-    <!-- Summary Metrics -->
-    <section class="panel panel-featured" aria-labelledby="summary-heading">
-      <div class="panel-head">
-        <h3 id="summary-heading">Execution topology &mdash; at a glance</h3>
-        <span class="hint">Click a metric to trace its source</span>
-      </div>
-      <div class="panel-body">
-        <div id="dashboard-metrics" aria-live="polite"></div>
-        <div id="graph-summary" class="micro" style="margin-top:var(--sp-2)"></div>
-      </div>
-    </section>
-
-    <!-- Step Content: DISCOVER -->
-    <section class="section step-content" id="step-discover-content" aria-labelledby="step-discover-heading">
-      <div class="section-head">
-        <h2 id="step-discover-heading">01 &middot; DISCOVER</h2>
-        <span class="hint">Execution surfaces found in this repository</span>
-      </div>
-      <div class="topology-row">
-        <section class="panel" aria-labelledby="surfaces-heading">
-          <div class="panel-head"><h3 id="surfaces-heading">Execution surfaces</h3><small id="surfaces-count">&mdash;</small></div>
-          <div class="panel-body">
-            <div id="surface-explorer" class="surface-list" aria-live="polite"></div>
-            <p class="micro">Grouped by ecosystem. Click a surface to inspect its trigger, file, and evidence.</p>
-          </div>
-        </section>
-        <section class="panel" aria-labelledby="graph-heading">
-          <div class="panel-head">
-            <h3 id="graph-heading">Execution topology</h3>
-            <span class="hint">SVG from live data &middot; Tab to inspect</span>
-          </div>
-          <div class="panel-body">
-            <p class="micro" style="margin:0 0 var(--sp-2)">Every node/edge corresponds to <code>analysis.graph</code>. Risk highlighted &mdash; not decoration.</p>
-            <div class="graph-toolbar" role="toolbar" aria-label="Graph filters">
-              <button class="chip is-active" data-filter="all" type="button">All</button>
-              <button class="chip" data-filter="high" type="button">High Risk</button>
-              <button class="chip" data-filter="network" type="button">Network</button>
-              <button class="chip" data-filter="process" type="button">Process</button>
-              <button class="chip" data-filter="unresolved" type="button">Unresolved</button>
-            </div>
-            <div id="graph-interactive" aria-live="polite"></div>
-            <div class="graph-legend" aria-label="Graph legend">
-              <span class="legend-item"><span class="legend-dot legend-dot-trigger"></span> Trigger</span>
-              <span class="legend-item"><span class="legend-dot legend-dot-command"></span> Command</span>
-              <span class="legend-item"><span class="legend-dot legend-dot-script"></span> Script</span>
-              <span class="legend-item"><span class="legend-dot legend-dot-file"></span> File</span>
-              <span class="legend-item"><span class="legend-dot legend-dot-cap"></span> Capability</span>
-              <span class="legend-item"><span class="legend-dot legend-dot-risk"></span> High-Risk</span>
-              <span class="legend-item"><span class="legend-dot legend-dot-unres"></span> Unresolved</span>
-            </div>
-          </div>
-        </section>
-      </div>
-    </section>
-
-    <!-- Step Content: DETECT -->
-    <section class="section step-content" id="step-detect-content" aria-labelledby="step-detect-heading">
-      <div class="section-head">
-        <h2 id="step-detect-heading">02 &middot; DETECT</h2>
-        <span class="hint">Automatic execution analysis</span>
-      </div>
-      <div id="execution-cards" aria-live="polite"></div>
-    </section>
-
-    <!-- Step Content: TRACE -->
-    <section class="section step-content" id="step-trace-content" aria-labelledby="step-trace-heading">
-      <div class="section-head">
-        <h2 id="step-trace-heading">03 &middot; TRACE</h2>
-        <span class="hint">Multi-hop execution path resolution</span>
-      </div>
-      <section class="panel" aria-labelledby="selected-path-heading">
-        <div class="panel-head">
-          <h3 id="selected-path-heading">Selected execution path</h3>
-          <small id="selected-path-meta">Critical path highlighted &mdash; explains risk</small>
-        </div>
-        <div class="panel-body">
-          <div id="selected-path" aria-live="polite"></div>
-          <div id="path-list" style="display:none" aria-hidden="true"></div>
-          <div id="paths-count" class="micro" style="display:none"></div>
-        </div>
-      </section>
-    </section>
-
-    <!-- Step Content: ANALYZE -->
-    <section class="section step-content" id="step-analyze-content" aria-labelledby="step-analyze-heading">
-      <div class="section-head">
-        <h2 id="step-analyze-heading">04 &middot; ANALYZE</h2>
-        <span class="hint">Capabilities, risk, and evidence</span>
-      </div>
-      <div class="caps-risk-grid">
-        <section class="panel" aria-labelledby="caps-heading">
-          <div class="panel-head"><h3 id="caps-heading">Capabilities</h3><small>only actual &middot; structured tags</small></div>
-          <div class="panel-body">
-            <div id="cap-chips" class="cap-chips"></div>
-            <p id="caps-empty" class="empty" style="display:none">No capabilities detected in this fixture.</p>
-            <p class="micro" style="margin-top:var(--sp-2)">Click a capability to highlight related paths and evidence. Only detector-backed &mdash; no placeholders.</p>
-          </div>
-        </section>
-        <section class="panel" aria-labelledby="risk-heading">
-          <div class="panel-head"><h3 id="risk-heading">Risk</h3><small>explainable &middot; risk &ne; malware</small></div>
-          <div class="panel-body">
-            <div id="risk-panel"></div>
-            <ul id="why-list" class="why-list"></ul>
-            <p class="micro" style="margin-top:var(--sp-2)"><strong>Risk &ne; malware.</strong> Static evidence, not a malware verdict.</p>
-            <details class="risk-details"><summary>How risk is calculated</summary>
-              <div class="risk-table">
-                <div><code>automatic + network + process</code> &rarr; <strong>HIGH</strong></div>
-                <div><code>automatic + remote + process</code> &rarr; <strong>HIGH</strong></div>
-                <div><code>automatic + remote + process + obfuscation</code> &rarr; <strong>CRITICAL</strong></div>
-                <div><code>automatic + runtime-bootstrap + network</code> &rarr; <strong>CRITICAL</strong></div>
-                <div><code>automatic + cross-tool</code> &rarr; <strong>HIGH</strong></div>
-                <div><code>manual / no capability</code> &rarr; <strong>LOW</strong></div>
-                <div class="micro" style="margin-top:var(--sp-2)">Confidence: HIGH literal &middot; MEDIUM resolved &middot; LOW dynamic</div>
-              </div>
-            </details>
-          </div>
-        </section>
-      </div>
-
-      <!-- Evidence -->
-      <section class="panel" aria-labelledby="evidence-heading">
-        <div class="panel-head"><h3 id="evidence-heading">Evidence</h3><small id="evidence-count"></small></div>
-        <div class="panel-body">
-          <div class="evidence-toolbar" role="toolbar" aria-label="Evidence filters">
-            <label class="evidence-filter"><span>Search</span><input id="evidence-search" type="search" placeholder="file, field, detector&hellip;"></label>
-            <label class="evidence-filter"><span>Detector</span><select id="evidence-detector"><option value="all">All detectors</option></select></label>
-            <label class="evidence-filter"><span>Confidence</span><select id="evidence-confidence"><option value="all">All</option><option value="HIGH">HIGH</option><option value="MEDIUM">MEDIUM</option><option value="LOW">LOW</option></select></label>
-            <label class="evidence-filter"><span>File</span><select id="evidence-file"><option value="all">All files</option></select></label>
-            <button id="evidence-clear" class="btn btn-ghost btn-sm" type="button">Clear</button>
-            <button id="evidence-export" class="btn btn-sm" type="button">Copy JSON</button>
-          </div>
-        </div>
-        <div class="panel-body panel-body-flush" style="padding-top:0">
-          <div class="table-wrap">
-            <table aria-label="Evidence">
-              <thead><tr><th>Source</th><th>Field</th><th>Detector</th><th>Reason</th><th>Excerpt</th><th>Conf</th></tr></thead>
-              <tbody id="evidence-body"></tbody>
-            </table>
-          </div>
-          <div class="pager" id="evidence-pager" aria-label="Evidence pagination"></div>
-          <div id="evidence-trace" class="evidence-trace" aria-live="polite"></div>
-        </div>
-      </section>
-    </section>
-
-    <!-- Step Content: WATCH -->
-    <section class="section step-content" id="step-watch-content" aria-labelledby="step-watch-heading">
-      <div class="section-head">
-        <h2 id="step-watch-heading">05 &middot; WATCH</h2>
-        <span class="hint">Baseline &amp; change detection</span>
-      </div>
-      <section class="panel" aria-labelledby="baseline-heading">
-        <div class="panel-head">
-          <h3 id="baseline-heading">Trust workflow &mdash; Baseline &amp; Diff</h3>
-          <small>BEFORE &rarr; AFTER &middot; Detect execution-surface change</small>
-        </div>
-        <div class="panel-body">
-          <div class="baseline-flow" aria-label="Baseline workflow">
-            <div class="flow-step">
-              <div class="flow-num">1</div>
-              <div class="flow-body">
-                <strong>Save trusted baseline</strong>
-                <span class="micro">Record current execution surfaces, capabilities, and graph</span>
-                <button id="btn-baseline" class="btn btn-primary" type="button">Save baseline</button>
-              </div>
-            </div>
-            <div class="flow-arrow" aria-hidden="true">&rarr;</div>
-            <div class="flow-step">
-              <div class="flow-num">2</div>
-              <div class="flow-body">
-                <strong>Simulate incoming change</strong>
-                <span class="micro">Adds a network-capable line to the fixture</span>
-                <button id="btn-change" class="btn" type="button">Simulate change</button>
-              </div>
-            </div>
-            <div class="flow-arrow" aria-hidden="true">&rarr;</div>
-            <div class="flow-step">
-              <div class="flow-num">3</div>
-              <div class="flow-body">
-                <strong>Compare</strong>
-                <span class="micro">Reveal new trigger, command, capability</span>
-                <button id="btn-diff" class="btn" type="button" disabled>Compare to baseline</button>
-              </div>
-            </div>
-            <div class="flow-step flow-step-reset">
-              <button id="btn-reset" class="btn btn-ghost btn-sm" type="button">Reset fixture</button>
-            </div>
-          </div>
-          <div id="baseline-box" class="baseline-box" aria-live="polite" tabindex="0">No baseline saved yet.</div>
-          <div id="baseline-method" class="micro" style="font-family:var(--mono)"></div>
-          <div class="diff-grid" style="margin-top:var(--sp-4)">
-            <div><h4>File drift</h4><div id="diff-changes" class="diff-list"><span class="empty">Save a baseline first.</span></div></div>
-            <div><h4>Semantic</h4><div id="diff-semantic" class="diff-list"><span class="empty">NEW_TRIGGER / NEW_REFERENCE / NEW_CAPABILITY</span></div></div>
-          </div>
-          <div style="margin-top:var(--sp-4); border-top:1px solid var(--border); padding-top:var(--sp-4)">
-            <h4 style="margin:0 0 var(--sp-2); font-size:13px">Capability diff &mdash; BEFORE <span aria-hidden="true">&rarr;</span> AFTER</h4>
-            <div id="capability-diff-viz" aria-live="polite"></div>
-          </div>
-          <div style="display:none">
-            <span id="policy-source">DEFAULT</span>
-            <div id="policy-panel"></div>
-            <div id="branch-panel"></div>
-            <div id="deps-count">0</div>
-            <div id="deps-proof-snippet"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- File exhibit -->
-      <section class="panel" aria-labelledby="files-heading">
-        <div class="panel-head"><h3 id="files-heading">File exhibit</h3><small id="files-count">0 files</small></div>
-        <div class="panel-body">
-          <div id="file-list" class="file-list" role="list" aria-label="Files in selected fixture"></div>
-          <div class="file-viewer" aria-live="polite">
-            <div class="file-viewer-header">
-              <span id="file-name">Select a file</span>
-              <span id="file-hash" class="badge badge-neutral">no file</span>
-            </div>
-            <pre id="file-content" tabindex="0" aria-label="File content viewer"><code>No file selected.</code></pre>
-          </div>
-          <p class="micro">Horizontal scroll &middot; line numbers &middot; evidence highlight when a finding is selected.</p>
-        </div>
-      </section>
-    </section>
-
+    </div>
   </div>
+</section>
 
-  <!-- ═══════════════════════════════════════════
-       PAGE 2: CORE ARCHITECTURE
-       ═══════════════════════════════════════════ -->
-  <div id="page-architecture" class="page-view" hidden>
+<!-- ═══════════════════════════════════════════
+     3. INTERACTIVE BENTO 3-PANE WORKSPACE
+     ═══════════════════════════════════════════ -->
+<section id="workspace-app" class="workspace-wrapper" aria-label="Security Intelligence Workspace">
+  <div class="shell">
+    <div class="workspace-shell">
 
-    <section class="hero" aria-labelledby="arch-hero-heading">
-      <p class="text-mono text-faint text-sm" style="letter-spacing:.08em;text-transform:uppercase">Technical deep-dive</p>
-      <h2 id="arch-hero-heading" class="display" style="margin:var(--sp-2) 0 var(--sp-3)">Core Architecture</h2>
-      <p class="hero-sub">Engine internals, detection pipeline, graph model, capability taxonomy, risk scoring, and the zero-trust execution model.</p>
-    </section>
+      <!-- ─── PANE 1: LEFT SIDEBAR ──────────────── -->
+      <aside class="sidebar-left" aria-label="Workspace Navigation">
+        
+        <!-- Repository Selector -->
+        <div class="sidebar-section">
+          <div class="sidebar-title">
+            <span>Target Repositories</span>
+            <span class="badge" id="repo-count-badge">5 fixtures</span>
+          </div>
+          
+          <div id="repo-grid" class="repo-nav-list" role="listbox" aria-label="Repositories">
+            <!-- Rendered dynamically by demo.js -->
+          </div>
 
-    <!-- Architecture sections -->
-    <div class="advanced-grid">
-      <section class="adv-section" aria-labelledby="arch-engine-heading">
-        <h3 id="arch-engine-heading">Analysis Engine</h3>
-        <p class="micro">HookAuditEngine is a pure-function pipeline: repo path in, normalized report out. No side effects, no network, no file writes.</p>
-        <div class="code-block" tabindex="0"><code>analyzeRepo(rootPath, opts)
-  &rarr; discover surfaces (hooks, scripts, configs)
-  &rarr; trace multi-hop references
-  &rarr; detect capabilities per surface
-  &rarr; compute risk scores
-  &rarr; build execution graph
-  &rarr; return normalized Report</code></div>
-      </section>
-      <section class="adv-section" aria-labelledby="arch-pipeline-heading">
-        <h3 id="arch-pipeline-heading">Detection Pipeline</h3>
-        <p class="micro">Each detector runs independently. Results are merged by surface ID.</p>
-        <div class="kv-grid">
-          <div><span class="kv-label">Discover</span><span class="kv-value">Surfaces</span></div>
-          <div><span class="kv-label">Detect</span><span class="kv-value">Capabilities</span></div>
-          <div><span class="kv-label">Trace</span><span class="kv-value">References</span></div>
-          <div><span class="kv-label">Analyze</span><span class="kv-value">Risk Score</span></div>
-          <div><span class="kv-label">Watch</span><span class="kv-value">Baseline Diff</span></div>
-          <div><span class="kv-label">Output</span><span class="kv-value">JSON / SARIF / HTML</span></div>
-        </div>
-      </section>
-      <section class="adv-section" aria-labelledby="arch-graph-heading">
-        <h3 id="arch-graph-heading">Execution Graph Model</h3>
-        <p class="micro">Directed acyclic graph. Nodes = entities. Edges = execution flow.</p>
-        <div class="graph-legend" aria-label="Node types">
-          <span class="legend-item"><span class="legend-dot legend-dot-trigger"></span> Trigger</span>
-          <span class="legend-item"><span class="legend-dot legend-dot-command"></span> Command</span>
-          <span class="legend-item"><span class="legend-dot legend-dot-script"></span> Script</span>
-          <span class="legend-item"><span class="legend-dot legend-dot-file"></span> File</span>
-          <span class="legend-item"><span class="legend-dot legend-dot-cap"></span> Capability</span>
-        </div>
-        <p style="font-size:13px;color:var(--ink-secondary);margin:var(--sp-2) 0 0">Every edge represents a real execution relationship discovered through static analysis. Trigger &rarr; Command &rarr; Script &rarr; Capability.</p>
-      </section>
-      <section class="adv-section" aria-labelledby="arch-risk-heading">
-        <h3 id="arch-risk-heading">Risk Scoring Model</h3>
-        <p class="micro">Evidence-weighted scoring. Risk &ne; malware.</p>
-        <div class="risk-table" style="margin:var(--sp-2) 0 0">
-          <div><code>automatic + network + process</code> &rarr; <strong>HIGH</strong></div>
-          <div><code>automatic + remote + process</code> &rarr; <strong>HIGH</strong></div>
-          <div><code>automatic + remote + process + obfuscation</code> &rarr; <strong>CRITICAL</strong></div>
-          <div><code>automatic + runtime-bootstrap + network</code> &rarr; <strong>CRITICAL</strong></div>
-          <div><code>automatic + cross-tool</code> &rarr; <strong>HIGH</strong></div>
-          <div><code>manual / no capability</code> &rarr; <strong>LOW</strong></div>
-        </div>
-      </section>
-    </div>
-
-    <!-- Capability Taxonomy -->
-    <section class="section" aria-labelledby="arch-caps-heading">
-      <div class="section-head">
-        <h3 id="arch-caps-heading">Capability Taxonomy</h3>
-        <span class="hint">Structured tags &mdash; detector-backed</span>
-      </div>
-      <div class="cap-chips" style="gap:var(--sp-2)">
-        <span class="cap-chip cap-chip-net">network</span>
-        <span class="cap-chip cap-chip-process">process</span>
-        <span class="cap-chip cap-chip-cross">cross-tool</span>
-        <span class="cap-chip cap-chip-obf">obfuscation</span>
-        <span class="cap-chip cap-chip-dynamic">dynamic</span>
-      </div>
-      <p class="micro" style="margin-top:var(--sp-2)">Each capability maps to one or more detector rules. Confidence levels: HIGH (literal match), MEDIUM (resolved reference), LOW (dynamic construction).</p>
-    </section>
-
-    <!-- CLI Reference -->
-    <section class="section" aria-labelledby="arch-cli-heading">
-      <div class="section-head">
-        <h3 id="arch-cli-heading">CLI Reference</h3>
-        <span class="hint">Web demo = demonstration &middot; CLI = scanner</span>
-      </div>
-      <div class="code-block" tabindex="0"><code>node bin/hookaudit.js .                              # human-readable
-node bin/hookaudit.js scan --path demo/sample-repository --json
-node bin/hookaudit.js . --sarif                         # SARIF 2.1.0
-node bin/hookaudit.js . --html report.html              # self-contained HTML
-node bin/hookaudit.js baseline .                        # trust current state
-node bin/hookaudit.js diff .                            # NEW/CHANGED + NEW_CAPABILITY
-node bin/hookaudit.js branches . --json                 # local branch comparison
-node bin/hookaudit.js --help</code></div>
-      <p class="micro">Outputs: <code>human</code> <code>json</code> <code>sarif</code> <code>html</code> &mdash; all from the same normalized report model.</p>
-    </section>
-
-    <!-- Zero-Dependency Proof -->
-    <section class="section" aria-labelledby="arch-zd-heading">
-      <div class="section-head">
-        <h3 id="arch-zd-heading">Zero-Dependency Proof</h3>
-        <span class="hint">proof, not claim</span>
-      </div>
-      <div class="kv-grid">
-        <div><span class="kv-label">Runtime dependencies</span><span class="kv-value">0</span></div>
-        <div><span class="kv-label">Third-party packages</span><span class="kv-value">None</span></div>
-        <div><span class="kv-label">Core runtime</span><span class="kv-value">Node.js Standard Library</span></div>
-        <div><span class="kv-label">Target code</span><span class="kv-value">Never executed</span></div>
-      </div>
-      <p class="micro" style="margin-top:var(--sp-2)"><a href="STDLIB.md">STDLIB.md</a> &middot; <a href="deps-proof.txt">deps-proof.txt</a> &middot; <a href="SECURITY.md">SECURITY.md</a> &middot; <code>npm ls --all &rarr; (empty)</code></p>
-    </section>
-
-    <!-- Policy & Diagnostics -->
-    <div class="advanced-grid">
-      <section class="adv-section" aria-labelledby="arch-policy-heading">
-        <h3 id="arch-policy-heading">Policy</h3>
-        <p class="micro">Policy maps severities/risks to <code>PASS/REVIEW/BLOCK</code> &mdash; never hides evidence. Try <code>.hookaudit/policy.yaml</code> vs <code>policy.toml</code> (CLI).</p>
-        <div id="policy-panel-adv"></div>
-      </section>
-      <section class="adv-section" aria-labelledby="arch-diag-heading">
-        <h3 id="arch-diag-heading">Diagnostics</h3>
-        <div id="diagnostics-list" class="diag-list"></div>
-      </section>
-    </div>
-
-    <!-- Branch Comparison -->
-    <section class="section" aria-labelledby="arch-branch-heading">
-      <div class="section-head">
-        <h3 id="arch-branch-heading">Branch Comparison</h3>
-        <span class="hint">local, no git exec</span>
-      </div>
-      <p class="micro">CLI: <code>node bin/hookaudit.js branches --json</code> reads <code>.git/HEAD</code> + <code>refs/heads</code> + <code>packed-refs</code> via <code>node:zlib</code> (no <code>git</code> binary).</p>
-      <div id="branch-panel-adv" class="micro" style="font-family:var(--mono); white-space:pre-wrap"></div>
-    </section>
-
-    <!-- Exports -->
-    <section class="section" aria-labelledby="arch-export-heading">
-      <div class="section-head">
-        <h3 id="arch-export-heading">Exports</h3>
-        <span class="hint">real artifacts &middot; local only</span>
-      </div>
-      <div class="btn-group">
-        <button id="btn-export-json" class="btn btn-sm" type="button">Download JSON</button>
-        <button id="btn-export-sarif" class="btn btn-sm" type="button">Download SARIF</button>
-        <button id="btn-export-html" class="btn btn-sm" type="button">Download HTML</button>
-      </div>
-      <p class="micro" style="margin-top:var(--sp-2)">Generates artifacts from live analysis &mdash; no server, no upload.</p>
-      <div id="export-status" class="micro" aria-live="polite"></div>
-    </section>
-
-    <!-- Terminal View -->
-    <section class="section" aria-labelledby="arch-terminal-heading">
-      <div class="section-head">
-        <h3 id="arch-terminal-heading">Terminal</h3>
-        <span class="hint">Simulated CLI output &mdash; offline</span>
-      </div>
-      <div class="terminal" aria-labelledby="term-heading">
-        <div class="terminal-head">
-          <div class="flex items-center gap-2">
-            <span class="terminal-dots" aria-hidden="true"><span class="r"></span><span class="y"></span><span class="g"></span></span>
-            <span id="term-heading">Simulated terminal &mdash; offline &middot; not a real shell</span>
+          <!-- Drag & Drop Custom Folder Scanner -->
+          <div id="repo-dropzone" class="repo-dropzone" title="Drag and drop any local project folder or click to browse">
+            <div class="dropzone-icon">📁</div>
+            <div class="dropzone-title">Audit Local Folder</div>
+            <div class="dropzone-sub">Drop folder or click to browse<br>Client-side only · 0 bytes sent</div>
+            <input type="file" id="folder-upload-input" webkitdirectory directory multiple style="display:none">
           </div>
         </div>
-        <div id="terminal" class="terminal-body" role="log" aria-live="polite" aria-label="Simulated terminal output"></div>
-        <div class="terminal-hint">Real CLI: <span class="kbd">node bin/hookaudit.js scan --path &lt;repo&gt; --json</span> &middot; <span class="kbd">node bin/hookaudit.js --sarif</span> &middot; <span class="kbd">node bin/hookaudit.js --html report.html</span></div>
+
+        <!-- Execution Surfaces Section -->
+        <div class="sidebar-section">
+          <div class="sidebar-title">
+            <span>Discovered Surfaces</span>
+            <span id="files-count" class="badge">0 files</span>
+          </div>
+          <div id="surface-list" class="surface-nav-list">
+            <!-- Rendered dynamically by demo.js -->
+          </div>
+        </div>
+
+        <!-- Integrity & Zero-Dep Footer -->
+        <div class="sidebar-section" style="border-bottom:none;background:var(--surface-subtle);font-size:11px;color:var(--ink-muted)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span>Dependencies:</span>
+            <strong id="deps-count" style="color:var(--success)">0 (stdlib only)</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span>Static Sandbox:</span>
+            <span style="color:var(--info);font-weight:600">Never Executes Code</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ─── PANE 2: CENTER WORKSPACE CANVAS ────── -->
+      <main class="main-canvas" aria-label="Main Workspace Canvas">
+        
+        <!-- Canvas Top Navigation Bar -->
+        <div class="canvas-header-bar">
+          <div class="canvas-tabs" role="tablist">
+            <button id="tab-topology" class="canvas-tab is-active" role="tab" aria-selected="true" data-canvas-tab="topology" type="button">
+              <span>⚡</span> Topology Canvas
+            </button>
+            <button id="tab-diff" class="canvas-tab" role="tab" aria-selected="false" data-canvas-tab="diff" type="button">
+              <span>🔄</span> Visual Code Diff
+            </button>
+            <button id="tab-evidence" class="canvas-tab" role="tab" aria-selected="false" data-canvas-tab="evidence" type="button">
+              <span>📋</span> Evidence Matrix
+            </button>
+            <button id="tab-story" class="canvas-tab" role="tab" aria-selected="false" data-canvas-tab="story" type="button">
+              <span>📖</span> Security Story
+            </button>
+          </div>
+
+          <!-- Quick Summary Stats in Canvas Header -->
+          <div class="canvas-actions">
+            <span class="badge badge-info" id="graph-summary">0 nodes</span>
+            <span class="badge badge-warning" id="canvas-high-badge">0 high risk</span>
+          </div>
+        </div>
+
+        <!-- Canvas Viewport -->
+        <div class="canvas-viewport">
+          
+          <!-- VIEW 1: TOPOLOGY GRAPH CANVAS -->
+          <div id="view-topology-pane" class="canvas-view-pane is-active">
+            <!-- Dashboard Metric Tiles -->
+            <div style="padding:var(--sp-3) var(--sp-4) 0 var(--sp-4)">
+              <div id="dashboard-metrics">
+                <!-- Rendered by dashboard.js -->
+              </div>
+            </div>
+
+            <!-- Interactive SVG Graph Container -->
+            <div style="flex:1;position:relative;margin:var(--sp-2) var(--sp-4) var(--sp-4) var(--sp-4);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:#ffffff;display:flex;flex-direction:column;min-height:420px">
+              <div id="graph-interactive" style="flex:1;position:relative;display:flex;flex-direction:column">
+                <!-- SVG Graph rendered here with Pan & Zoom -->
+              </div>
+            </div>
+          </div>
+
+          <!-- VIEW 2: VISUAL INLINE CODE DIFF -->
+          <div id="view-diff-pane" class="canvas-view-pane">
+            <div class="diff-container">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-3);background:var(--surface-subtle);border:1px solid var(--border);border-radius:var(--r-md);padding:var(--sp-3);flex-wrap:wrap;gap:var(--sp-2)">
+                <div>
+                  <h3 style="font-size:14px;margin-bottom:2px">Baseline Drift &amp; Visual Inline Diff</h3>
+                  <p style="font-size:11px;color:var(--ink-muted)">Compares working files against trusted baseline. Visualizes newly injected network/process lines.</p>
+                </div>
+                <div style="display:flex;gap:var(--sp-2)">
+                  <button id="btn-baseline" class="btn btn-sm btn-subtle" type="button">Save baseline</button>
+                  <button id="btn-change" class="btn btn-sm btn-subtle" type="button" style="color:var(--warning);border-color:var(--warning-border)">Simulate change</button>
+                  <button id="btn-diff" class="btn btn-sm btn-primary" type="button">Diff vs baseline</button>
+                  <button id="btn-reset" class="btn btn-sm btn-ghost" type="button">Reset</button>
+                </div>
+              </div>
+
+              <!-- Capability Drift Summary Cards -->
+              <div id="capability-diff-viz" style="margin-bottom:var(--sp-4)">
+                <!-- Rendered by dashboard.js -->
+              </div>
+
+              <!-- Inline Line-by-Line Code Diff Cards -->
+              <div id="diff-viewer-content">
+                <div class="empty">No baseline saved yet. Click "Save baseline" to establish a trusted snapshot, then "Simulate change" to view an inline visual diff.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- VIEW 3: SEARCHABLE EVIDENCE MATRIX -->
+          <div id="view-evidence-pane" class="canvas-view-pane">
+            <div style="padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-3)">
+              <!-- Evidence Toolbar -->
+              <div class="evidence-toolbar">
+                <div class="evidence-filter" style="flex:2">
+                  <input type="search" id="evidence-search" placeholder="Search paths, excerpts, detectors…">
+                </div>
+                <div class="evidence-filter">
+                  <select id="evidence-detector">
+                    <option value="all">All detectors</option>
+                  </select>
+                </div>
+                <div class="evidence-filter">
+                  <select id="evidence-confidence">
+                    <option value="all">All confidence</option>
+                    <option value="HIGH">HIGH</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="LOW">LOW</option>
+                  </select>
+                </div>
+                <div class="evidence-filter">
+                  <select id="evidence-file">
+                    <option value="all">All files</option>
+                  </select>
+                </div>
+                <div style="display:flex;gap:var(--sp-1);align-items:center">
+                  <button id="evidence-clear" class="btn btn-sm btn-subtle" type="button">Clear</button>
+                  <button id="evidence-export" class="btn btn-sm btn-ghost" type="button">Copy JSON</button>
+                </div>
+              </div>
+
+              <!-- Evidence Table -->
+              <div class="table-wrap">
+                <table aria-label="Evidence Explorer">
+                  <thead>
+                    <tr>
+                      <th>File</th>
+                      <th>Field</th>
+                      <th>Detector</th>
+                      <th>Reason</th>
+                      <th>Excerpt</th>
+                      <th>Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody id="evidence-body">
+                    <!-- Dynamically rendered -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Pagination & Count -->
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:var(--sp-2)">
+                <span id="evidence-count" style="font-size:11px;color:var(--ink-muted);font-family:var(--mono)">0 rows</span>
+                <div id="evidence-pager" class="pager" style="padding:0"></div>
+              </div>
+              <div id="evidence-trace" class="evidence-trace" style="margin-top:var(--sp-2);border-radius:var(--r-sm);font-size:11px;color:var(--ink-muted)">
+                Click any row to inspect file details.
+              </div>
+            </div>
+          </div>
+
+          <!-- VIEW 4: HOW IT WORKS STORY -->
+          <div id="view-story-pane" class="canvas-view-pane">
+            <div style="padding:var(--sp-4);overflow-y:auto">
+              <div style="max-width:800px;margin:0 auto var(--sp-4) auto">
+                <h2 style="font-size:20px;margin-bottom:var(--sp-2)">Evidence-Driven Security: The 5-Step Story</h2>
+                <p style="color:var(--ink-secondary);font-size:13px;line-height:1.6">
+                  A repository is a promise that some files will execute for you. HookAudit maps out exactly which surfaces can trigger code, when they fire, what capabilities they reach, and what changed since you trusted it.
+                </p>
+              </div>
+
+              <div class="how-grid">
+                <article class="how-card">
+                  <div class="how-num">01</div>
+                  <h3>DISCOVER — <span>Find where code hides</span></h3>
+                  <p class="how-story"><strong>If you just cloned a repo:</strong> we scan 12 surfaces (.claude, .vscode, package.json preinstall, git hooks, github workflows). No guessing, zero execution.</p>
+                  <div class="how-example"><code>.vscode/tasks.json → runOn: folderOpen</code></div>
+                </article>
+
+                <article class="how-card">
+                  <div class="how-num">02</div>
+                  <h3>DETECT — <span>Does it run automatically?</span></h3>
+                  <p class="how-story"><strong>If a surface has `SessionStart` or `folderOpen`:</strong> we mark it automatic (fires with no user approval). Manual tasks stay LOW risk.</p>
+                  <div class="how-example"><code>SessionStart → node .vscode/setup.mjs</code></div>
+                </article>
+
+                <article class="how-card">
+                  <div class="how-num">03</div>
+                  <h3>TRACE — <span>Follow multi-hop references</span></h3>
+                  <p class="how-story"><strong>If a hook runs `node a.js` and `a.js` requires `b.js`:</strong> the static resolver traverses the hops to find what code is actually reached.</p>
+                  <div class="how-example"><code>Hook → a.js → b.js → NETWORK</code></div>
+                </article>
+
+                <article class="how-card">
+                  <div class="how-num">04</div>
+                  <h3>ANALYZE — <span>Map capabilities &amp; risk</span></h3>
+                  <p class="how-story"><strong>If the chain reaches network + process execution + obfuscation:</strong> we score the path CRITICAL with exact field-level evidence.</p>
+                  <div class="how-example"><code>Auto + Network + Process → CRITICAL</code></div>
+                </article>
+
+                <article class="how-card">
+                  <div class="how-num">05</div>
+                  <h3>WATCH — <span>Did it drift since baseline?</span></h3>
+                  <p class="how-story"><strong>If you trusted it yesterday and today a script adds curl:</strong> HookAudit flags NEW_CAPABILITY NETWORK_ACCESS immediately.</p>
+                  <div class="how-example"><code>Save baseline → Simulate change → Diff</code></div>
+                </article>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+
+      <!-- ─── PANE 3: RIGHT CONTEXT INSPECTOR ───── -->
+      <aside class="inspector-right" aria-label="Inspector and Terminal Drawer">
+        
+        <!-- Inspector Header Tabs -->
+        <div class="inspector-tabs">
+          <button id="tab-inspector" class="inspector-tab is-active" type="button">Inspector</button>
+          <button id="tab-terminal" class="inspector-tab" type="button">CLI Terminal</button>
+        </div>
+
+        <!-- PANE A: INSPECTOR VIEW -->
+        <div id="inspector-pane" class="inspector-body">
+          
+          <!-- Selected Node / Path Details -->
+          <div id="inspector-content">
+            <div class="sidebar-title">Active Node Details</div>
+            <div id="selected-path">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- File Content Preview -->
+          <div style="border-top:1px solid var(--border);padding-top:var(--sp-3);margin-top:var(--sp-2)">
+            <div class="sidebar-title">
+              <span id="file-name">Source Inspector</span>
+              <span id="file-hash" class="badge">no file</span>
+            </div>
+            <div class="file-viewer" style="max-height:220px">
+              <pre id="file-content"><code>Select a node or surface to inspect code.</code></pre>
+            </div>
+          </div>
+
+          <!-- Why this matters rationale -->
+          <div style="border-top:1px solid var(--border);padding-top:var(--sp-3);margin-top:var(--sp-2)">
+            <div class="sidebar-title">Risk Rationale</div>
+            <ul id="why-list" style="list-style:none;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--ink-secondary)">
+              <!-- Populated dynamically -->
+            </ul>
+          </div>
+        </div>
+
+        <!-- PANE B: INTERACTIVE TERMINAL SIMULATOR -->
+        <div id="terminal-pane" class="terminal-interactive" style="display:none">
+          <div id="terminal" class="terminal-scroll" role="log" aria-label="Terminal output">
+            <!-- Lines dumped here -->
+          </div>
+          
+          <!-- Quick Chips -->
+          <div class="terminal-quick-chips">
+            <button class="terminal-chip" data-cmd="hookaudit ." type="button">scan</button>
+            <button class="terminal-chip" data-cmd="hookaudit baseline ." type="button">baseline</button>
+            <button class="terminal-chip" data-cmd="hookaudit diff ." type="button">diff</button>
+            <button class="terminal-chip" data-cmd="help" type="button">help</button>
+            <button class="terminal-chip" data-cmd="clear" type="button">clear</button>
+          </div>
+
+          <!-- Terminal Input Line -->
+          <div class="terminal-input-bar">
+            <span class="terminal-prompt-sym">hookaudit&gt;</span>
+            <input type="text" id="terminal-interactive-input" class="terminal-input-field" placeholder="Type scan, baseline, diff..." autocomplete="off" spellcheck="false">
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+</section>
+
+<!-- Hidden elements to preserve backward compatibility with existing tests and scripts -->
+<div style="display:none">
+  <div id="path-list"></div>
+  <div id="cap-chips"></div>
+  <div id="caps-empty"></div>
+  <div id="diagnostics-list"></div>
+  <div id="diag-count"></div>
+  <div id="baseline-box"></div>
+  <div id="baseline-method"></div>
+  <div id="diff-changes"></div>
+  <div id="diff-semantic"></div>
+  <div id="deps-proof-snippet"></div>
+  <div id="branch-panel"></div>
+  <div id="file-list"></div>
+  <div id="stat-surfaces"></div>
+  <div id="stat-findings"></div>
+  <div id="stat-high"></div>
+  <div id="stat-caps"></div>
+  <div id="stat-decision"></div>
+  <div id="export-status"></div>
+  <div id="selected-path-meta"></div>
+  <div class="steps-bar">
+    <div class="step" data-step="discover"><span class="step-dot"></span></div>
+    <div class="step" data-step="detect"><span class="step-dot"></span></div>
+    <div class="step" data-step="trace"><span class="step-dot"></span></div>
+    <div class="step" data-step="analyze"><span class="step-dot"></span></div>
+    <div class="step" data-step="watch"><span class="step-dot"></span></div>
+  </div>
+</div>
+
+<!-- Enhanced Interactive Guided Tour 4-Curtain Crystal-Clear Spotlight & Popover -->
+<div id="tour-overlay" class="tour-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+  <!-- 4 Curtains around the target: ZERO overlay over target = 100% sharp, 0% blur -->
+  <div id="tour-curtain-top" class="tour-curtain"></div>
+  <div id="tour-curtain-bottom" class="tour-curtain"></div>
+  <div id="tour-curtain-left" class="tour-curtain"></div>
+  <div id="tour-curtain-right" class="tour-curtain"></div>
+
+  <!-- Glowing blue border around the crystal-clear target hole -->
+  <div id="tour-spotlight-border" class="tour-spotlight-border"></div>
+  
+  <!-- Floating Tour Popover Card positioned adjacent to target -->
+  <div id="tour-popover" class="tour-popover-card">
+    <div class="tour-popover-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="tour-progress" class="badge badge-info">Step 1 of 5</span>
+        <h3 id="tour-title" style="font-size:14px;font-weight:800;color:var(--ink);margin:0">Target Repositories</h3>
       </div>
-    </section>
-
-    <!-- Hidden backward-compat elements -->
-    <div style="display:none" aria-hidden="true">
-      <div id="diagnostics-list-hidden"></div>
-      <div id="capability-diff-viz-hidden"></div>
-      <div id="deps-proof-snippet"></div>
-      <div id="branch-panel"></div>
+      <button id="tour-close-btn" class="tour-close-btn" type="button" aria-label="Close tour">×</button>
     </div>
 
-  </div>
+    <div class="tour-popover-body">
+      <p id="tour-text" style="font-size:12.5px;line-height:1.55;color:var(--ink-secondary);margin:0 0 12px 0"></p>
+      
+      <!-- Interactive Action Button inside Step -->
+      <div id="tour-interactive-action" style="margin-bottom:12px">
+        <button id="tour-action-btn" class="btn btn-sm btn-subtle" type="button" style="width:100%;border-color:var(--focus);color:var(--focus);font-weight:700">
+          ⚡ Try this action
+        </button>
+      </div>
 
-</main>
+      <!-- Step Progress Dots -->
+      <div id="tour-dots" class="tour-dots">
+        <span class="tour-dot is-active"></span>
+        <span class="tour-dot"></span>
+        <span class="tour-dot"></span>
+        <span class="tour-dot"></span>
+        <span class="tour-dot"></span>
+      </div>
+    </div>
 
-<footer class="footer" role="contentinfo">
-  <div class="shell footer-inner">
-    <div>
-      <strong>HookAudit</strong> &mdash; repository execution-topology auditor &middot; zero third-party runtime deps &middot; Track E<br>
-      Demo is static, offline, <code>file://</code> compatible. Baseline does not prove safety &mdash; it records what you chose to trust.
-    </div>
-    <div><a href="https://github.com/rohitkumarnaidu/HookAudit" rel="noopener">Public source</a> &middot; Honest demo &middot; synthetic fixtures only</div>
-  </div>
-</footer>
-
-<!-- Tour overlay (hidden by default) -->
-<div id="tour-overlay" class="tour-overlay hidden" role="dialog" aria-label="Guided tour">
-  <div class="tour-card">
-    <div class="tour-header">
-      <h3 id="tour-title">Welcome to HookAudit</h3>
-      <p id="tour-desc">A 5-step tour of the execution-topology auditor.</p>
-    </div>
-    <div class="tour-body">
-      <p id="tour-text">Select a repository fixture to see execution surfaces, trace multi-hop paths, and understand risk.</p>
-    </div>
-    <div class="tour-footer">
-      <span class="tour-progress" id="tour-progress">Step 1 of 5</span>
-      <div class="btn-group">
-        <button id="tour-skip" class="btn btn-ghost btn-sm" type="button">Skip</button>
-        <button id="tour-next" class="btn btn-primary btn-sm" type="button">Next</button>
+    <div class="tour-popover-footer">
+      <button id="tour-prev" class="btn btn-sm btn-ghost" type="button">← Back</button>
+      <div style="display:flex;gap:6px">
+        <button id="tour-skip" class="btn btn-sm btn-ghost" type="button">Skip</button>
+        <button id="tour-next" class="btn btn-sm btn-primary" type="button">Next →</button>
       </div>
     </div>
   </div>
 </div>
 
-<script src="demo/engine.js?v=how-story"></script>
-<script src="demo/dashboard.js?v=how-story"></script>
-<script src="demo/demo.js?v=how-story"></script>
+<!-- Standalone, 100% Zero-Dep Offline Scripts -->
+<script src="demo/engine.js"></script>
+<script src="demo/dashboard.js"></script>
+<script src="demo/demo.js"></script>
 </body>
 </html>

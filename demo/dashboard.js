@@ -1,8 +1,8 @@
 /* HookAudit — Thin dashboard & P2 visualizations (zero-dep, static)
- * Provides: dashboard metrics, interactive execution graph (SVG), capability diff viz
+ * Provides: dashboard metrics, interactive execution graph (SVG with Pan & Zoom), capability diff viz
  * All data derived from HookAuditEngine output — no fake metrics, no external fetches.
  * Accessibility: keyboard nav, focus-visible, ARIA, respects prefers-reduced-motion.
- * Visual: paper/ink/muted slate — no neon, no giant gradients.
+ * Visual: Modern Dark Developer Workspace (Deep Slate / OLED) — WCAG AAA.
  */
 (function () {
   'use strict';
@@ -92,45 +92,39 @@
 
     var items = [
       {
-        id: 'surfaces', label: 'Execution surfaces', value: String(m.executionSurfaces),
-        foot: m.withFindings + ' with findings', hint: 'Files matching known globs — click to show file exhibit',
-        target: 'files-heading', action: function () { scrollToId('files-heading'); },
-        title: 'Execution surfaces are discovered files matching SURFACES globs; withFindings have extracted triggers.'
+        id: 'surfaces', label: 'Surfaces', value: String(m.executionSurfaces),
+        foot: m.withFindings + ' with findings', hint: 'Discovered config & script surfaces',
+        action: function () { scrollToId('files-heading'); }
       },
       {
-        id: 'paths', label: 'Execution paths', value: String(m.paths),
+        id: 'paths', label: 'Paths', value: String(m.paths),
         foot: m.graphSummary.nodes + ' nodes · ' + m.graphSummary.edges + ' edges',
-        hint: 'Derived paths: CONFIG → TRIGGER → COMMAND → SCRIPT … — click to see path list',
-        target: 'paths-heading', action: function () { scrollToId('paths-heading'); },
-        title: 'Paths are deterministic chains from actual graph edges, not decoration.'
+        hint: 'Resolved deterministic paths',
+        action: function () { scrollToId('paths-heading'); }
       },
       {
-        id: 'high', label: 'High-risk paths', value: String(m.highRiskPaths),
+        id: 'high', label: 'High Risk', value: String(m.highRiskPaths),
         foot: m.decision + ' decision',
-        hint: m.highRiskPaths ? 'HIGH or CRITICAL — click to inspect' : 'No high-risk paths in this fixture',
-        target: 'paths-heading', action: function () { scrollToId('paths-heading'); highlightHighRisk(); },
-        title: 'HIGH/CRITICAL per unified rule table: automatic + network/process/remote/obfuscation/cross-tool'
+        hint: m.highRiskPaths ? 'CRITICAL / HIGH' : 'No high-risk paths',
+        action: function () { scrollToId('paths-heading'); highlightHighRisk(); }
       },
       {
         id: 'caps', label: 'Capabilities', value: String(m.capabilityCount),
-        foot: m.capabilities.slice(0, 3).join(', ') || 'no caps detected',
-        hint: 'Reachable capabilities from detectors — click to see chips',
-        target: 'caps-heading', action: function () { scrollToId('caps-heading'); },
-        title: 'Capabilities are evidence-backed (P0/P1/P2) — only shown when a detector fires on a reachable file.'
+        foot: m.capabilities.slice(0, 2).join(', ') || 'none',
+        hint: 'Reachable capabilities',
+        action: function () { scrollToId('caps-heading'); }
       },
       {
-        id: 'new', label: 'New since baseline', value: String(m.newSinceBaseline),
-        foot: m.newCapList.slice(0, 2).join(', ') || (diffResult ? 'no new caps' : 'no baseline yet'),
-        hint: diffResult ? 'NEW_CAPABILITY count from real diff — click to see baseline diff' : 'Save a baseline first, then simulate change',
-        target: 'baseline-heading', action: function () { scrollToId('baseline-heading'); },
-        title: 'NEW_CAPABILITY is computed by comparing baseline capabilitySummary vs current reachable capabilities.'
+        id: 'new', label: 'Drift Caps', value: String(m.newSinceBaseline),
+        foot: m.newCapList.slice(0, 2).join(', ') || (diffResult ? 'no new caps' : 'no baseline'),
+        hint: 'NEW_CAPABILITY signals',
+        action: function () { scrollToId('baseline-heading'); }
       },
       {
-        id: 'unresolved', label: 'Unresolved / needs review', value: String(m.unresolved),
-        foot: m.unresolved ? 'UNRESOLVED / BOUNDARY / DYNAMIC / CYCLE' : 'all references resolved',
-        hint: m.unresolved ? 'Click to inspect diagnostics' : 'No unresolved references',
-        target: 'diag-heading', action: function () { scrollToId('diag-heading'); },
-        title: 'Honest uncertainty: UNRESOLVED_REFERENCE, BOUNDARY_VIOLATION, DYNAMIC_EXECUTION, CYCLE_DETECTED.'
+        id: 'unresolved', label: 'Diagnostics', value: String(m.unresolved),
+        foot: m.unresolved ? 'Unresolved / Boundary' : 'all clean',
+        hint: 'Diagnostics & boundary alerts',
+        action: function () { scrollToId('diag-heading'); }
       }
     ];
 
@@ -138,12 +132,10 @@
       var card = el('button', 'dash-card dash-card--' + it.id);
       card.type = 'button';
       card.setAttribute('aria-label', it.label + ': ' + it.value + '. ' + it.hint);
-      card.title = it.title;
       card.dataset.metric = it.id;
 
       var label = el('div', 'dash-label', it.label);
       var value = el('div', 'dash-value', it.value);
-      // highlight intent: high-risk critical if >0, new caps if >0, unresolved if >0
       if ((it.id === 'high' && m.highRiskPaths > 0) || (it.id === 'new' && m.newSinceBaseline > 0) || (it.id === 'unresolved' && m.unresolved > 0)) {
         value.classList.add('dash-value--alert');
       }
@@ -151,15 +143,9 @@
       if (it.id === 'high' && m.decision === 'PASS') value.classList.add('dash-value--ok');
 
       var foot = el('div', 'dash-foot', it.foot);
-      var hint = el('div', 'dash-hint', it.hint);
       card.appendChild(label);
       card.appendChild(value);
       card.appendChild(foot);
-      card.appendChild(hint);
-      // small trace link arrow
-      var trace = el('span', 'dash-trace', '→ trace');
-      trace.setAttribute('aria-hidden', 'true');
-      card.appendChild(trace);
 
       card.addEventListener('click', it.action);
       card.addEventListener('keydown', function (e) {
@@ -169,11 +155,6 @@
     });
 
     container.appendChild(grid);
-
-    // provenance line
-    var prov = el('div', 'dash-prov');
-    prov.innerHTML = 'All metrics derived from <code>HookAuditEngine.analyzeRepo()</code> — nodes/edges/paths/capabilities/diagnostics — no sampled or synthetic numbers. <span style="color:var(--text-dim)">Decisive for review: high-risk + newSinceBaseline + unresolved.</span>';
-    container.appendChild(prov);
 
     // expose for tests
     container.dataset.surfaces = String(m.executionSurfaces);
@@ -188,17 +169,11 @@
     var elTarget = document.getElementById(id);
     if (elTarget) {
       elTarget.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
-      // focus heading for a11y
       elTarget.setAttribute('tabindex', '-1');
       try { elTarget.focus({ preventScroll: true }); } catch (e) { elTarget.focus(); }
-      // highlight pulse
-      var panel = elTarget.closest('.panel');
-      if (panel) {
-        panel.classList.add('panel--pulse');
-        setTimeout(function () { panel.classList.remove('panel--pulse'); }, 1200);
-      }
     }
   }
+
   function highlightHighRisk() {
     var list = document.getElementById('path-list');
     if (!list) return;
@@ -210,11 +185,12 @@
       }
     });
   }
+
   function prefersReducedMotion() {
     try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
   }
 
-  // ---------- 2. INTERACTIVE EXECUTION GRAPH (SVG) ----------
+  // ---------- 2. INTERACTIVE EXECUTION GRAPH (SVG + PAN/ZOOM) ----------
   function renderGraph(containerId, graph, analysis) {
     var wrap = document.getElementById(containerId);
     if (!wrap) return;
@@ -224,7 +200,6 @@
       return;
     }
 
-    // Build adjacency for depth
     var nodes = graph.nodes.slice();
     var edges = graph.edges.slice();
     var paths = graph.paths || [];
@@ -238,9 +213,8 @@
     var queue = [];
     var repoNode = nodes.find(function (n) { return n.kind === 'REPOSITORY'; });
     if (repoNode) { depth[repoNode.id] = 0; queue.push(repoNode.id); }
-    else { // fallback: first node depth 0
-      depth[nodes[0].id] = 0; queue.push(nodes[0].id);
-    }
+    else { depth[nodes[0].id] = 0; queue.push(nodes[0].id); }
+
     var adj = {};
     edges.forEach(function (e) {
       if (!adj[e.from]) adj[e.from] = [];
@@ -257,22 +231,19 @@
         }
       }
     }
-    // For orphan nodes, assign by kind order
-    var kindOrder = { 'REPOSITORY': 0, 'CONFIG': 1, 'TRIGGER': 2, 'COMMAND': 3, 'SCRIPT': 4, 'FILE': 4, 'CAPABILITY': 5, 'PROCESS': 4, 'NETWORK': 5 };
+    var kindOrder = { 'REPOSITORY': 0, 'CONFIG': 1, 'TRIGGER': 2, 'COMMAND': 3, 'SCRIPT': 4, 'FILE': 4, 'CAPABILITY': 5 };
     nodes.forEach(function (n) {
       if (depth[n.id] === undefined) {
         depth[n.id] = kindOrder[n.kind] !== undefined ? kindOrder[n.kind] : 4;
       }
     });
 
-    // Assign y within each depth layer
     var layers = {};
     nodes.forEach(function (n) {
       var d = depth[n.id];
       if (!layers[d]) layers[d] = [];
       layers[d].push(n);
     });
-    // sort each layer deterministically by label/path/id
     Object.keys(layers).forEach(function (dk) {
       layers[dk].sort(function (a, b) { return (a.label + a.id).localeCompare(b.label + b.id); });
     });
@@ -280,104 +251,74 @@
     var depthKeys = Object.keys(layers).map(Number).sort(function (a, b) { return a - b; });
     var maxLayerSize = Math.max.apply(null, depthKeys.map(function (k) { return layers[k].length; }));
 
-    // Layout constants
-    var colW = 150;
-    var rowH = 56;
-    var padX = 40;
-    var padY = 40;
-    var nodeW = 110;
-    var nodeH = 34;
-    var width = Math.max(720, depthKeys.length * colW + padX * 2 + 60);
-    var height = Math.max(220, maxLayerSize * rowH + padY * 2 + 40);
-    // cap width for readability, allow scroll
-    if (width < 900 && depthKeys.length <= 6) width = 900;
+    // Dimensions
+    var colW = 165;
+    var rowH = 62;
+    var padX = 50;
+    var padY = 50;
+    var nodeW = 125;
+    var nodeH = 38;
+    var width = Math.max(900, depthKeys.length * colW + padX * 2 + 80);
+    var height = Math.max(380, maxLayerSize * rowH + padY * 2 + 60);
 
-    // Create controls
-    var controls = el('div', 'graph-controls');
-    var legend = el('div', 'graph-legend');
-    [
-      { kind: 'CONFIG', label: 'CONFIG', cls: 'legend--config' },
-      { kind: 'TRIGGER', label: 'TRIGGER', cls: 'legend--trigger' },
-      { kind: 'COMMAND', label: 'COMMAND', cls: 'legend--command' },
-      { kind: 'SCRIPT', label: 'SCRIPT', cls: 'legend--script' },
-      { kind: 'CAPABILITY', label: 'CAPABILITY', cls: 'legend--cap' },
-      { kind: 'NETWORK', label: 'NETWORK', cls: 'legend--network' }
-    ].forEach(function (it) {
-      var s = el('span', 'legend-item ' + it.cls, it.label);
-      legend.appendChild(s);
-    });
-    var edgeLegend = el('div', 'graph-legend');
-    [
-      { k: 'CONTAINS', l: 'CONTAINS' },
-      { k: 'TRIGGERS', l: 'TRIGGERS' },
-      { k: 'EXECUTES', l: 'EXECUTES' },
-      { k: 'REFERENCES', l: 'REFERENCES' },
-      { k: 'CONNECTS_TO', l: 'CONNECTS_TO' }
-    ].forEach(function (it) {
-      var s = el('span', 'legend-edge', it.l);
-      edgeLegend.appendChild(s);
-    });
+    // Floating overlay filter bar
+    var filterBar = el('div', 'graph-filter-overlay');
+    var btnAll = el('button', 'btn btn-sm btn-subtle is-active', 'All');
+    btnAll.dataset.filter = 'all';
+    var btnHigh = el('button', 'btn btn-sm btn-subtle', 'High Risk');
+    btnHigh.dataset.filter = 'high';
+    var btnNetwork = el('button', 'btn btn-sm btn-subtle', 'Network');
+    btnNetwork.dataset.filter = 'network';
+    var btnProcess = el('button', 'btn btn-sm btn-subtle', 'Process');
+    btnProcess.dataset.filter = 'process';
+    var btnUnres = el('button', 'btn btn-sm btn-subtle', 'Unresolved');
+    btnUnres.dataset.filter = 'unresolved';
 
-    var filterBar = el('div', 'graph-filters');
-    var btnAll = el('button', 'btn btn--sm is-active', 'All');
-    btnAll.type = 'button'; btnAll.dataset.filter = 'all';
-    var btnHigh = el('button', 'btn btn--sm', 'High-risk only');
-    btnHigh.type = 'button'; btnHigh.dataset.filter = 'high';
-    var btnNetwork = el('button', 'btn btn--sm', 'Network');
-    btnNetwork.type = 'button'; btnNetwork.dataset.filter = 'network';
-    var btnProcess = el('button', 'btn btn--sm', 'Process');
-    btnProcess.type = 'button'; btnProcess.dataset.filter = 'process';
-    var btnUnres = el('button', 'btn btn--sm', 'Unresolved');
-    btnUnres.type = 'button'; btnUnres.dataset.filter = 'unresolved';
-    filterBar.appendChild(el('span', 'graph-filter-label', 'Filter:'));
-    filterBar.appendChild(btnAll); filterBar.appendChild(btnHigh); filterBar.appendChild(btnNetwork); filterBar.appendChild(btnProcess); filterBar.appendChild(btnUnres);
-    var hint = el('div', 'graph-hint', 'Click or press Enter on a node to inspect. Arrow keys move focus. High-risk edges are emphasized.');
-    hint.setAttribute('role', 'note');
+    filterBar.appendChild(btnAll);
+    filterBar.appendChild(btnHigh);
+    filterBar.appendChild(btnNetwork);
+    filterBar.appendChild(btnProcess);
+    filterBar.appendChild(btnUnres);
+    wrap.appendChild(filterBar);
 
-    controls.appendChild(legend);
-    controls.appendChild(edgeLegend);
-    controls.appendChild(filterBar);
-    wrap.appendChild(controls);
-    wrap.appendChild(hint);
-
-    // SVG container with scroll
-    var svgWrap = el('div', 'graph-svg-wrap');
-    svgWrap.setAttribute('role', 'region');
-    svgWrap.setAttribute('aria-label', 'Execution graph — use Tab to reach nodes, Enter to inspect');
+    // Viewport with Pan & Zoom
+    var svgWrap = el('div', 'topology-viewport');
     svgWrap.tabIndex = 0;
     wrap.appendChild(svgWrap);
 
     var NS = 'http://www.w3.org/2000/svg';
     var svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('width', String(width));
-    svg.setAttribute('height', String(height));
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
     svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
-    svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', 'Execution graph: ' + nodes.length + ' nodes, ' + edges.length + ' edges, ' + paths.length + ' paths');
     svg.classList.add('graph-svg');
     svgWrap.appendChild(svg);
 
-    // defs for arrows
+    // Defs for arrows and gradients
     var defs = document.createElementNS(NS, 'defs');
     function marker(id, color) {
       var m = document.createElementNS(NS, 'marker');
       m.setAttribute('id', id); m.setAttribute('viewBox', '0 0 10 10'); m.setAttribute('refX', '9'); m.setAttribute('refY', '5');
-      m.setAttribute('markerWidth', '8'); m.setAttribute('markerHeight', '8'); m.setAttribute('orient', 'auto');
+      m.setAttribute('markerWidth', '7'); m.setAttribute('markerHeight', '7'); m.setAttribute('orient', 'auto');
       var p = document.createElementNS(NS, 'path'); p.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z'); p.setAttribute('fill', color);
       m.appendChild(p); return m;
     }
-    defs.appendChild(marker('arrow-default', '#94a3b8'));
-    defs.appendChild(marker('arrow-high', '#991b1b'));
-    defs.appendChild(marker('arrow-network', '#9a3412'));
-    defs.appendChild(marker('arrow-cap', '#475569'));
+    defs.appendChild(marker('arrow-default', '#64748b'));
+    defs.appendChild(marker('arrow-high', '#dc2626'));
+    defs.appendChild(marker('arrow-network', '#d97706'));
+    defs.appendChild(marker('arrow-cap', '#64748b'));
     svg.appendChild(defs);
 
+    // Zoom & Pan Container Group
+    var canvasGroup = document.createElementNS(NS, 'g');
+    canvasGroup.classList.add('topology-canvas-content');
+    svg.appendChild(canvasGroup);
+
     // Compute positions
-    var pos = {}; // id -> {x,y}
+    var pos = {};
     depthKeys.forEach(function (d, di) {
       var layer = layers[d];
       var colX = padX + di * colW + 20;
-      // center layer vertically
       var totalH = layer.length * rowH;
       var startY = padY + (height - padY * 2 - totalH) / 2 + rowH / 2;
       layer.forEach(function (node, idx) {
@@ -386,12 +327,12 @@
       });
     });
 
-     // Determine high-risk node ids for filtering
+    // Determine high-risk & capability node sets
     var highRiskNodeIds = new Set();
     var networkNodeIds = new Set();
     var processNodeIds = new Set();
     var unresolvedNodeIds = new Set();
-    var pathByNode = {}; // nodeId -> [pathIds]
+    var pathByNode = {};
     paths.forEach(function (p) {
       p.nodes.forEach(function (nid) {
         if (!pathByNode[nid]) pathByNode[nid] = [];
@@ -406,21 +347,10 @@
       if (n.kind === 'CAPABILITY' && (n.path === 'NETWORK_ACCESS' || n.path === 'REMOTE_DOWNLOAD' || n.path === 'RUNTIME_BOOTSTRAP')) networkNodeIds.add(n.id);
       if (n.kind === 'CAPABILITY' && n.path === 'PROCESS_EXECUTION') processNodeIds.add(n.id);
       if (n.capabilities && (n.capabilities.indexOf('DYNAMIC_EXECUTION') !== -1)) unresolvedNodeIds.add(n.id);
-      if (n.label && n.label.indexOf('(UNRESOLVED)') !== -1) unresolvedNodeIds.add(n.id);
-      if (n.label && n.label.indexOf('(DYNAMIC)') !== -1) unresolvedNodeIds.add(n.id);
-      if (n.label && n.label.indexOf('(BOUNDARY)') !== -1) unresolvedNodeIds.add(n.id);
-      if (n.label && n.label.indexOf('(CYCLE)') !== -1) unresolvedNodeIds.add(n.id);
+      if (n.label && (n.label.indexOf('(UNRESOLVED)') !== -1 || n.label.indexOf('(BOUNDARY)') !== -1 || n.label.indexOf('(CYCLE)') !== -1)) unresolvedNodeIds.add(n.id);
     });
-    // Also add diagnostic nodes to unresolved
-    if (analysis && analysis.diagnostics) {
-      analysis.diagnostics.forEach(function (d) {
-        if (['UNRESOLVED_REFERENCE','BOUNDARY_VIOLATION','DYNAMIC_EXECUTION','CYCLE_DETECTED'].indexOf(d.code) !== -1) {
-          nodes.forEach(function (n) { if (n.path === d.path || n.label.indexOf(d.path) !== -1) unresolvedNodeIds.add(n.id); });
-        }
-      });
-    }
 
-    // Draw edges first (behind nodes)
+    // Draw edges
     var edgeEls = [];
     edges.forEach(function (e) {
       var from = pos[e.from], to = pos[e.to];
@@ -428,6 +358,7 @@
       var line = document.createElementNS(NS, 'g');
       line.classList.add('graph-edge-group');
       line.dataset.from = e.from; line.dataset.to = e.to; line.dataset.kind = e.kind;
+
       var isHigh = highRiskNodeIds.has(e.from) && highRiskNodeIds.has(e.to);
       var isNetwork = e.kind === 'CONNECTS_TO' && networkNodeIds.has(e.to);
       var pathEl = document.createElementNS(NS, 'path');
@@ -435,209 +366,177 @@
       var y1 = from.y;
       var x2 = to.x - nodeW / 2;
       var y2 = to.y;
-      // curved path
       var mx = (x1 + x2) / 2;
       var d = 'M ' + x1 + ' ' + y1 + ' C ' + mx + ' ' + y1 + ', ' + mx + ' ' + y2 + ', ' + x2 + ' ' + y2;
       pathEl.setAttribute('d', d);
       pathEl.setAttribute('fill', 'none');
-      pathEl.setAttribute('stroke-width', isHigh ? '2.2' : '1.4');
-      if (isHigh) { pathEl.setAttribute('stroke', '#991b1b'); pathEl.setAttribute('marker-end', 'url(#arrow-high)'); }
+      pathEl.setAttribute('stroke-width', isHigh ? '2.4' : '1.4');
+      if (isHigh) { pathEl.setAttribute('stroke', '#dc2626'); pathEl.setAttribute('marker-end', 'url(#arrow-high)'); }
       else if (e.kind === 'CONNECTS_TO') { pathEl.setAttribute('stroke', '#64748b'); pathEl.setAttribute('stroke-dasharray', '4 3'); pathEl.setAttribute('marker-end', 'url(#arrow-cap)'); }
-      else if (isNetwork) { pathEl.setAttribute('stroke', '#9a3412'); pathEl.setAttribute('marker-end', 'url(#arrow-network)'); }
+      else if (isNetwork) { pathEl.setAttribute('stroke', '#d97706'); pathEl.setAttribute('marker-end', 'url(#arrow-network)'); }
       else { pathEl.setAttribute('stroke', '#94a3b8'); pathEl.setAttribute('marker-end', 'url(#arrow-default)'); }
       pathEl.classList.add('graph-edge');
-      if (isHigh) pathEl.classList.add('graph-edge--high');
-      if (e.diagnostic) pathEl.classList.add('graph-edge--diagnostic');
-      line.appendChild(pathEl);
-      // edge label on hover
-      var title = document.createElementNS(NS, 'title');
-      title.textContent = e.kind + ': ' + e.from + ' → ' + e.to + (e.evidence && e.evidence.path ? ' (' + e.evidence.path + ')' : '') + (e.diagnostic ? ' [' + e.diagnostic + ']' : '');
-      line.appendChild(title);
-      // small kind label at midpoint
-      var text = document.createElementNS(NS, 'text');
-      text.setAttribute('x', String(mx));
-      text.setAttribute('y', String((y1 + y2) / 2 - 4));
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('font-size', '8');
-      text.setAttribute('font-family', 'ui-monospace, monospace');
-      text.setAttribute('fill', '#64748b');
-      text.textContent = e.kind;
-      text.classList.add('graph-edge-label');
-      line.appendChild(text);
 
-      svg.appendChild(line);
+      line.appendChild(pathEl);
+      canvasGroup.appendChild(line);
       edgeEls.push(line);
     });
 
     // Draw nodes
     var nodeEls = [];
     var selectedNodeId = null;
-    var details = el('div', 'graph-details');
-    details.setAttribute('aria-live', 'polite');
-    details.setAttribute('role', 'region');
-    details.setAttribute('aria-label', 'Node details');
-    details.innerHTML = '<div class="empty" style="margin:0">Select a node to see evidence, capabilities, and reachable paths. Use Tab / arrow keys to navigate.</div>';
-    wrap.appendChild(details);
 
-    function nodeFill(kind, label) {
-      if (kind === 'REPOSITORY') return '#0f172a';
-      if (kind === 'CONFIG') return '#ffffff';
-      if (kind === 'TRIGGER') return '#0f172a';
-      if (kind === 'COMMAND') return '#f1f5f9';
-      if (kind === 'SCRIPT') return '#e0f2fe';
-      if (kind === 'FILE') return '#f8fafc';
-      if (kind === 'CAPABILITY') {
-        if (label === 'NETWORK_ACCESS' || label === 'REMOTE_DOWNLOAD') return '#ffedd5';
-        if (label === 'OBFUSCATION' || label === 'CREDENTIAL_ACCESS_SIGNAL') return '#fee2e2';
-        if (label === 'CROSS_TOOL_LINK') return '#fef3c7';
-        return '#f1f5f9';
-      }
-      return '#ffffff';
-    }
-    function nodeStroke(kind) {
-      if (kind === 'REPOSITORY' || kind === 'TRIGGER') return '#0f172a';
-      if (kind === 'SCRIPT') return '#0ea5e9';
-      if (kind === 'CAPABILITY') return '#64748b';
-      return '#cbd5e1';
-    }
-    function nodeLabel(kind, n) {
-      var l = n.label || n.path || n.id;
-      if (kind === 'COMMAND') {
-        return l.length > 22 ? l.slice(0, 22) + '…' : l;
-      }
-      if (l.length > 18) return l.slice(0, 18) + '…';
-      return l;
-    }
-
-    // Create focusable groups for each node
-    var nodeOrder = nodes.slice().sort(function (a, b) {
-      if (depth[a.id] !== depth[b.id]) return depth[a.id] - depth[b.id];
-      return pos[a.id].y - pos[b.id].y;
-    });
-
-    nodeOrder.forEach(function (n) {
+    nodes.forEach(function (n) {
       var p = pos[n.id];
+      if (!p) return;
       var g = document.createElementNS(NS, 'g');
       g.classList.add('graph-node');
-      g.classList.add('graph-node--' + n.kind.toLowerCase());
-      if (highRiskNodeIds.has(n.id)) g.classList.add('graph-node--high');
-      if (networkNodeIds.has(n.id)) g.classList.add('graph-node--network');
-      g.setAttribute('transform', 'translate(' + (p.x - nodeW / 2) + ',' + (p.y - nodeH / 2) + ')');
-      g.setAttribute('tabindex', '0');
-      g.setAttribute('role', 'button');
-      var capStr = (n.capabilities && n.capabilities.length) ? ' · ' + n.capabilities.join(', ') : '';
-      g.setAttribute('aria-label', n.kind + ' ' + (n.label || n.path) + capStr + ' — press Enter to inspect');
       g.dataset.nodeId = n.id;
       g.dataset.kind = n.kind;
+      g.tabIndex = 0;
 
       var rect = document.createElementNS(NS, 'rect');
+      rect.setAttribute('x', String(p.x - nodeW / 2));
+      rect.setAttribute('y', String(p.y - nodeH / 2));
       rect.setAttribute('width', String(nodeW));
       rect.setAttribute('height', String(nodeH));
-      rect.setAttribute('rx', n.kind === 'CAPABILITY' ? '16' : n.kind === 'TRIGGER' ? '16' : '8');
-      rect.setAttribute('ry', n.kind === 'CAPABILITY' ? '16' : n.kind === 'TRIGGER' ? '16' : '8');
-      rect.setAttribute('fill', nodeFill(n.kind, n.label || n.path));
-      rect.setAttribute('stroke', nodeStroke(n.kind));
-      rect.setAttribute('stroke-width', highRiskNodeIds.has(n.id) ? '1.8' : '1.2');
-      if (n.kind === 'TRIGGER') rect.setAttribute('fill', '#0f172a');
+      rect.setAttribute('rx', '8');
+      rect.setAttribute('ry', '8');
+      rect.setAttribute('stroke-width', '1.4');
+
+      // Light theme colors per node type
+      var textColor = '#0f172a';
+      if (n.kind === 'REPOSITORY') {
+        rect.setAttribute('fill', '#ffffff'); rect.setAttribute('stroke', '#2563eb'); textColor = '#1e3a8a';
+      } else if (n.kind === 'TRIGGER') {
+        rect.setAttribute('fill', '#0f172a'); rect.setAttribute('stroke', '#0f172a'); textColor = '#ffffff';
+      } else if (n.kind === 'COMMAND') {
+        rect.setAttribute('fill', '#f8fafc'); rect.setAttribute('stroke', '#cbd5e1'); textColor = '#0f172a';
+      } else if (n.kind === 'SCRIPT') {
+        rect.setAttribute('fill', '#e0f2fe'); rect.setAttribute('stroke', '#0284c7'); textColor = '#0369a1';
+      } else if (n.kind === 'CAPABILITY') {
+        var isNet = (n.path === 'NETWORK_ACCESS' || n.path === 'REMOTE_DOWNLOAD');
+        rect.setAttribute('fill', isNet ? '#fef3c7' : '#f3e8ff');
+        rect.setAttribute('stroke', isNet ? '#d97706' : '#9333ea');
+        textColor = isNet ? '#92400e' : '#6b21a8';
+      } else {
+        rect.setAttribute('fill', '#ffffff'); rect.setAttribute('stroke', '#e2e8f0'); textColor = '#0f172a';
+      }
+
+      if (highRiskNodeIds.has(n.id)) {
+        rect.setAttribute('stroke', '#dc2626');
+        rect.setAttribute('stroke-width', '2.2');
+        if (n.kind !== 'TRIGGER') {
+          rect.setAttribute('fill', '#fee2e2');
+          textColor = '#991b1b';
+        }
+      }
+
       g.appendChild(rect);
 
-      // small kind badge at top
-      var kindText = document.createElementNS(NS, 'text');
-      kindText.setAttribute('x', '8');
-      kindText.setAttribute('y', '10');
-      kindText.setAttribute('font-size', '6.5');
-      kindText.setAttribute('font-family', 'ui-monospace, monospace');
-      kindText.setAttribute('letter-spacing', '0.04em');
-      kindText.setAttribute('fill', n.kind === 'TRIGGER' || n.kind === 'REPOSITORY' ? '#e2e8f0' : '#64748b');
-      kindText.textContent = n.kind;
-      g.appendChild(kindText);
+      // Node label
+      var text = document.createElementNS(NS, 'text');
+      text.setAttribute('x', String(p.x));
+      text.setAttribute('y', String(p.y + 4));
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('fill', textColor);
+      text.setAttribute('font-size', '11');
+      text.setAttribute('font-family', 'ui-monospace, monospace');
+      text.setAttribute('font-weight', '600');
+      var fullLabel = n.label || n.path || n.id;
+      text.textContent = fullLabel.length > 18 ? fullLabel.slice(0, 18) + '…' : fullLabel;
+      g.appendChild(text);
 
-      var labelText = document.createElementNS(NS, 'text');
-      labelText.setAttribute('x', String(nodeW / 2));
-      labelText.setAttribute('y', '21');
-      labelText.setAttribute('text-anchor', 'middle');
-      labelText.setAttribute('font-size', '7.5');
-      labelText.setAttribute('font-family', 'ui-monospace, monospace');
-      labelText.setAttribute('font-weight', '600');
-      labelText.setAttribute('fill', n.kind === 'TRIGGER' || n.kind === 'REPOSITORY' ? '#f8fafc' : '#0f172a');
-      labelText.textContent = nodeLabel(n.kind, n);
-      g.appendChild(labelText);
+      // SVG title for native tooltip
+      var titleEl = document.createElementNS(NS, 'title');
+      titleEl.textContent = n.kind + ': ' + fullLabel;
+      g.appendChild(titleEl);
 
-      // capability dots for nodes that have caps
-      if (n.capabilities && n.capabilities.length) {
-        var capText = document.createElementNS(NS, 'text');
-        capText.setAttribute('x', String(nodeW / 2));
-        capText.setAttribute('y', '29');
-        capText.setAttribute('text-anchor', 'middle');
-        capText.setAttribute('font-size', '6');
-        capText.setAttribute('font-family', 'ui-monospace, monospace');
-        capText.setAttribute('fill', '#475569');
-        var short = n.capabilities.slice(0, 2).join(', ');
-        if (n.capabilities.length > 2) short += ' +' + (n.capabilities.length - 2);
-        capText.textContent = short;
-        g.appendChild(capText);
-      }
-
-      var title = document.createElementNS(NS, 'title');
-      title.textContent = n.kind + ': ' + (n.label || n.path) + (n.capabilities && n.capabilities.length ? ' — ' + n.capabilities.join(', ') : '') + (pathByNode[n.id] ? ' — in ' + pathByNode[n.id].length + ' path(s)' : '');
-      g.appendChild(title);
-
-      // Interactions
+      // Selection handling
       function selectNode() {
-        // clear previous
-        if (selectedNodeId) {
-          var prev = svg.querySelector('[data-node-id="' + selectedNodeId + '"]');
-          if (prev) prev.classList.remove('is-selected');
-        }
         selectedNodeId = n.id;
+        nodeEls.forEach(function (ng) { ng.classList.remove('is-selected', 'is-related'); });
         g.classList.add('is-selected');
-        // highlight edges incident to this node
+
         edgeEls.forEach(function (eg) {
-          eg.classList.remove('is-highlight');
-          if (eg.dataset.from === n.id || eg.dataset.to === n.id) eg.classList.add('is-highlight');
+          var hl = (eg.dataset.from === n.id || eg.dataset.to === n.id);
+          eg.classList.toggle('is-highlight', hl);
         });
-        // highlight related nodes in same paths
-        var relatedIds = new Set([n.id]);
+
+        // Dispatch selection event for inspector drawer
         var relatedPaths = pathByNode[n.id] || [];
-        relatedPaths.forEach(function (pid) {
-          var p = paths.find(function (x) { return x.id === pid; });
-          if (p) p.nodes.forEach(function (nid) { relatedIds.add(nid); });
-        });
-        nodeEls.forEach(function (ng) {
-          ng.classList.remove('is-related');
-          if (relatedIds.has(ng.dataset.nodeId) && ng.dataset.nodeId !== n.id) ng.classList.add('is-related');
-        });
-        renderDetails(n, relatedPaths, paths);
-        // trace link: if node path corresponds to a file, offer to open
-        details.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'nearest' });
+        window.dispatchEvent(new CustomEvent('hookaudit:node-selected', {
+          detail: { node: n, relatedPaths: relatedPaths, allPaths: paths }
+        }));
       }
+
       g.addEventListener('click', selectNode);
       g.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectNode(); }
-        else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-          e.preventDefault();
-          var idx = nodeOrder.indexOf(n);
-          var next = nodeOrder[(idx + 1) % nodeOrder.length];
-          var elNext = svg.querySelector('[data-node-id="' + next.id + '"]');
-          if (elNext) elNext.focus();
-        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-          e.preventDefault();
-          var idx2 = nodeOrder.indexOf(n);
-          var prev = nodeOrder[(idx2 - 1 + nodeOrder.length) % nodeOrder.length];
-          var elPrev = svg.querySelector('[data-node-id="' + prev.id + '"]');
-          if (elPrev) elPrev.focus();
-        }
-      });
-      g.addEventListener('focus', function () {
-        g.classList.add('is-focused');
-      });
-      g.addEventListener('blur', function () {
-        g.classList.remove('is-focused');
       });
 
-      svg.appendChild(g);
+      canvasGroup.appendChild(g);
       nodeEls.push(g);
     });
+
+    // Pan & Zoom Engine
+    var zoomLevel = 1.0;
+    var panX = 0, panY = 0;
+    var isDragging = false;
+    var startX = 0, startY = 0;
+
+    function applyTransform() {
+      canvasGroup.setAttribute('transform', 'translate(' + panX + ',' + panY + ') scale(' + zoomLevel + ')');
+      var zoomText = wrap.querySelector('.zoom-level-text');
+      if (zoomText) zoomText.textContent = Math.round(zoomLevel * 100) + '%';
+    }
+
+    svgWrap.addEventListener('mousedown', function (e) {
+      if (e.target.closest('.graph-node')) return; // let node click through
+      isDragging = true;
+      startX = e.clientX - panX;
+      startY = e.clientY - panY;
+    });
+
+    window.addEventListener('mousemove', function (e) {
+      if (!isDragging) return;
+      panX = e.clientX - startX;
+      panY = e.clientY - startY;
+      applyTransform();
+    });
+
+    window.addEventListener('mouseup', function () {
+      isDragging = false;
+    });
+
+    svgWrap.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      var delta = e.deltaY > 0 ? -0.1 : 0.1;
+      zoomLevel = Math.max(0.4, Math.min(2.5, zoomLevel + delta));
+      applyTransform();
+    }, { passive: false });
+
+    // Floating Zoom Controls
+    var zoomControls = el('div', 'zoom-controls');
+    var btnIn = el('button', 'zoom-btn', '+');
+    btnIn.title = 'Zoom in';
+    btnIn.addEventListener('click', function () { zoomLevel = Math.min(2.5, zoomLevel + 0.2); applyTransform(); });
+
+    var zoomText = el('span', 'zoom-level-text', '100%');
+
+    var btnOut = el('button', 'zoom-btn', '−');
+    btnOut.title = 'Zoom out';
+    btnOut.addEventListener('click', function () { zoomLevel = Math.max(0.4, zoomLevel - 0.2); applyTransform(); });
+
+    var btnReset = el('button', 'zoom-btn', '⟲');
+    btnReset.title = 'Reset view';
+    btnReset.addEventListener('click', function () { zoomLevel = 1.0; panX = 0; panY = 0; applyTransform(); });
+
+    zoomControls.appendChild(btnIn);
+    zoomControls.appendChild(zoomText);
+    zoomControls.appendChild(btnOut);
+    zoomControls.appendChild(btnReset);
+    wrap.appendChild(zoomControls);
 
     // Filter interactions
     function applyFilter(kind) {
@@ -655,9 +554,8 @@
         if (kind === 'network') show = networkNodeIds.has(nid);
         if (kind === 'process') show = processNodeIds.has(nid);
         if (kind === 'unresolved') show = unresolvedNodeIds.has(nid);
-        ng.style.opacity = show ? '1' : '0.18';
+        ng.style.opacity = show ? '1' : '0.15';
         ng.style.pointerEvents = show ? 'auto' : 'none';
-        ng.setAttribute('aria-hidden', show ? 'false' : 'true');
       });
       edgeEls.forEach(function (eg) {
         var show = true;
@@ -665,157 +563,17 @@
         if (kind === 'network') show = networkNodeIds.has(eg.dataset.from) || networkNodeIds.has(eg.dataset.to);
         if (kind === 'process') show = processNodeIds.has(eg.dataset.from) || processNodeIds.has(eg.dataset.to);
         if (kind === 'unresolved') show = unresolvedNodeIds.has(eg.dataset.from) || unresolvedNodeIds.has(eg.dataset.to);
-        eg.style.opacity = show ? '1' : '0.12';
-      });
-      // Also sync outer chips
-      document.querySelectorAll('.chip[data-filter]').forEach(function (c) {
-        c.classList.toggle('is-active', c.dataset.filter === kind);
+        eg.style.opacity = show ? '1' : '0.1';
       });
     }
+
     btnAll.addEventListener('click', function () { applyFilter('all'); });
     btnHigh.addEventListener('click', function () { applyFilter('high'); });
     btnNetwork.addEventListener('click', function () { applyFilter('network'); });
     btnProcess.addEventListener('click', function () { applyFilter('process'); });
     btnUnres.addEventListener('click', function () { applyFilter('unresolved'); });
-    // Handle outer toolbar chips (index.html hero toolbar)
-    document.querySelectorAll('.chip--filter[data-filter]').forEach(function (outer) {
-      outer.addEventListener('click', function () {
-        var k = outer.dataset.filter;
-        applyFilter(k);
-      });
-    });
 
-    // Also add subtle depth labels at top
-    var axis = el('div', 'graph-axis');
-    depthKeys.forEach(function (d, di) {
-      var colLabel = el('span', 'axis-col');
-      // infer col name by most common kind at that depth
-      var kinds = layers[d].map(function (n) { return n.kind; });
-      var uniqKind = kinds[0] || String(d);
-      // count
-      var cnt = layers[d].length;
-      colLabel.textContent = uniqKind + ' (' + cnt + ')';
-      colLabel.setAttribute('aria-hidden', 'true');
-      axis.appendChild(colLabel);
-      // keep in DOM for a11y but visually position via CSS grid? Instead append to wrap as flex
-    });
-    // insert axis before svgWrap
-    svgWrap.parentNode.insertBefore(axis, svgWrap);
-
-    // keyboard help for svgWrap
-    svgWrap.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') {
-        var first = nodeOrder[0];
-        if (first) {
-          var elFirst = svg.querySelector('[data-node-id="' + first.id + '"]');
-          if (elFirst) elFirst.focus();
-        }
-      }
-    });
-
-    function renderDetails(node, relatedPathIds, allPaths) {
-      details.innerHTML = '';
-      var head = el('div', 'graph-details-head');
-      var kindBadge = el('span', 'graph-kind-badge graph-kind-badge--' + node.kind.toLowerCase(), node.kind);
-      head.appendChild(kindBadge);
-      var titleEl = el('strong', null, node.label || node.path || node.id);
-      titleEl.style.fontFamily = 'var(--mono)';
-      titleEl.style.fontSize = '.82rem';
-      head.appendChild(titleEl);
-      if (node.capabilities && node.capabilities.length) {
-        var capsWrap = el('div', 'graph-details-caps');
-        node.capabilities.forEach(function (cap) {
-          capsWrap.appendChild(el('span', 'cap-chip ' + capChipClass(cap), cap));
-        });
-        head.appendChild(capsWrap);
-      }
-      details.appendChild(head);
-
-      // Evidence for node
-      if (node.path) {
-        var pathLine = el('div', 'graph-details-line');
-        pathLine.innerHTML = '<span style="color:var(--text-muted); font-family:var(--mono); font-size:.74rem">path</span> <code style="font-family:var(--mono); font-size:.78rem">' + escapeHtml(node.path) + '</code>';
-        details.appendChild(pathLine);
-      }
-      if (node.confidence) {
-        var confLine = el('div', 'graph-details-line');
-        confLine.innerHTML = '<span style="color:var(--text-muted); font-size:.76rem">confidence</span> <span class="conf-chip conf-chip--' + node.confidence.toLowerCase() + '">' + node.confidence + '</span>';
-        details.appendChild(confLine);
-      }
-
-      // Paths containing this node
-      if (relatedPathIds.length) {
-        var pathsTitle = el('div', 'graph-details-title', relatedPathIds.length + ' execution path(s) through this node:');
-        details.appendChild(pathsTitle);
-        var list = el('div', 'graph-details-paths');
-        relatedPathIds.slice(0, 6).forEach(function (pid) {
-          var p = allPaths.find(function (x) { return x.id === pid; });
-          if (!p) return;
-          var card = el('div', 'mini-path-card');
-          var row = el('div', 'mini-path-head');
-          row.appendChild(el('span', 'badge ' + riskClass(p.risk), p.risk));
-          row.appendChild(el('span', 'mini-path-trigger', p.trigger));
-          row.appendChild(el('span', 'badge badge--conf', p.confidence));
-          card.appendChild(row);
-          var chain = el('div', 'mini-path-chain');
-          p.chain.forEach(function (c, i) {
-            var s = el('span', 'mini-step', c.length > 30 ? c.slice(0, 30) + '…' : c);
-            chain.appendChild(s);
-            if (i < p.chain.length - 1) chain.appendChild(el('span', 'mini-arrow', '→'));
-          });
-          card.appendChild(chain);
-          if (p.capabilities && p.capabilities.length) {
-            var capWrap = el('div', 'mini-path-caps');
-            p.capabilities.forEach(function (cap) { capWrap.appendChild(el('span', 'cap-chip ' + capChipClass(cap), cap)); });
-            card.appendChild(capWrap);
-          }
-          list.appendChild(card);
-        });
-        if (relatedPathIds.length > 6) {
-          list.appendChild(el('div', 'graph-details-more', '…and ' + (relatedPathIds.length - 6) + ' more path(s) not shown'));
-        }
-        details.appendChild(list);
-      } else {
-        details.appendChild(el('div', 'graph-details-note', 'No execution path traverses this node alone — it may be an orphan CONFIG or capability summary node.'));
-      }
-
-      // Trace actions
-      var actions = el('div', 'graph-details-actions');
-      if (node.path && node.path.indexOf('/') !== -1) {
-        var btnFile = el('button', 'btn btn--sm');
-        btnFile.type = 'button';
-        btnFile.textContent = 'Open in file exhibit →';
-        btnFile.addEventListener('click', function () {
-          // try to find file in file exhibit
-          var fileList = document.getElementById('file-list');
-          if (fileList) {
-            var btns = fileList.querySelectorAll('.file-btn');
-            for (var i = 0; i < btns.length; i++) {
-              if (btns[i].textContent.indexOf(node.path) !== -1) { btns[i].click(); scrollToId('files-heading'); break; }
-            }
-          }
-        });
-        actions.appendChild(btnFile);
-      }
-      var btnClose = el('button', 'btn btn--sm btn--ghost');
-      btnClose.type = 'button';
-      btnClose.textContent = 'Clear highlight';
-      btnClose.addEventListener('click', function () {
-        nodeEls.forEach(function (ng) { ng.classList.remove('is-selected', 'is-related'); });
-        edgeEls.forEach(function (eg) { eg.classList.remove('is-highlight'); });
-        selectedNodeId = null;
-        details.innerHTML = '<div class="empty" style="margin:0">Select a node to see evidence, capabilities, and reachable paths.</div>';
-      });
-      actions.appendChild(btnClose);
-      details.appendChild(actions);
-    }
-
-    // summary provenance
-    var prov = el('div', 'graph-prov');
-    prov.textContent = 'Graph rendered from analysis.graph (nodes/edges/paths) — deterministic layout by depth, not a mock. Edges match real resolver trace; grouping by kind preserves topology.';
-    wrap.appendChild(prov);
-
-    // expose node count for tests
+    // Expose metadata for test parity
     wrap.dataset.nodes = String(nodes.length);
     wrap.dataset.edges = String(edges.length);
     wrap.dataset.paths = String(paths.length);
@@ -827,7 +585,7 @@
     if (!container) return;
     container.innerHTML = '';
     if (!baselineRecord) {
-      container.innerHTML = '<div class="empty" style="margin:0">No baseline yet — capability diff will appear after you save a baseline and simulate a change.</div>';
+      container.innerHTML = '<div class="empty">No baseline yet — save a baseline then simulate a change to see drift.</div>';
       return;
     }
     if (!analysis) return;
@@ -840,14 +598,12 @@
 
     var allCapsUnion = Array.from(new Set([].concat(baselineCaps).concat(currentCaps))).sort();
     if (!allCapsUnion.length) {
-      container.innerHTML = '<div class="empty" style="margin:0">No capabilities in baseline or current — diff shows no change.</div>';
+      container.innerHTML = '<div class="empty">No capabilities in baseline or current analysis.</div>';
       return;
     }
 
     var tableWrap = el('div', 'table-wrap');
-    tableWrap.style.marginTop = '8px';
     var table = document.createElement('table');
-    table.setAttribute('aria-label', 'Capability diff matrix — baseline vs current');
     var thead = document.createElement('thead');
     var hr = document.createElement('tr');
     ['Capability', 'Baseline', 'Current', 'Status', 'Evidence'].forEach(function (h) {
@@ -861,37 +617,34 @@
       var inBase = baselineCaps.indexOf(cap) !== -1;
       var inCurr = currentCaps.indexOf(cap) !== -1;
       var tr = document.createElement('tr');
-      if (inCurr && !inBase) tr.classList.add('row--added');
-      if (!inCurr && inBase) tr.classList.add('row--removed');
 
       var tdCap = document.createElement('td');
-      tdCap.className = 'mono';
-      var chip = el('span', 'cap-chip ' + capChipClass(cap), cap);
-      tdCap.appendChild(chip);
+      tdCap.className = 'mono-cell';
+      tdCap.appendChild(el('span', 'cap-chip ' + capChipClass(cap), cap));
       tr.appendChild(tdCap);
 
-      var tdBase = document.createElement('td'); tdBase.textContent = inBase ? 'present' : '—'; tdBase.style.fontSize = '.78rem'; tdBase.style.color = inBase ? 'var(--text)' : 'var(--text-dim)'; tr.appendChild(tdBase);
-      var tdCurr = document.createElement('td'); tdCurr.textContent = inCurr ? 'present' : '—'; tdCurr.style.fontSize = '.78rem'; tdCurr.style.color = inCurr ? 'var(--text)' : 'var(--text-dim)'; tr.appendChild(tdCurr);
+      var tdBase = document.createElement('td'); tdBase.textContent = inBase ? 'present' : '—'; tr.appendChild(tdBase);
+      var tdCurr = document.createElement('td'); tdCurr.textContent = inCurr ? 'present' : '—'; tr.appendChild(tdCurr);
 
       var tdStatus = document.createElement('td');
-      if (inCurr && !inBase) { var s = el('span', 'diff-tag diff-tag--new', 'NEW_CAPABILITY'); tdStatus.appendChild(s); newCount++; }
-      else if (!inCurr && inBase) { var s2 = el('span', 'diff-tag diff-tag--removed', 'REMOVED'); tdStatus.appendChild(s2); }
-      else if (inCurr && inBase) { tdStatus.textContent = 'unchanged'; tdStatus.style.color = 'var(--text-muted)'; tdStatus.style.fontSize = '.78rem'; }
-      else { tdStatus.textContent = '—'; }
+      if (inCurr && !inBase) {
+        tdStatus.appendChild(el('span', 'badge badge--critical', 'NEW_CAPABILITY'));
+        newCount++;
+      } else if (!inCurr && inBase) {
+        tdStatus.appendChild(el('span', 'badge', 'REMOVED'));
+      } else {
+        tdStatus.textContent = 'unchanged';
+      }
       tr.appendChild(tdStatus);
 
-      var tdEv = document.createElement('td'); tdEv.style.fontSize = '.76rem';
-      // find evidence for cap in current analysis
+      var tdEv = document.createElement('td');
       var evs = [];
       analysis.results.forEach(function (r) {
         r.findings.forEach(function (f) {
-          if (f.capabilities && f.capabilities.indexOf(cap) !== -1) {
-            evs.push(r.file + ' ' + (f.field || ''));
-          }
+          if (f.capabilities && f.capabilities.indexOf(cap) !== -1) evs.push(r.file);
         });
       });
       tdEv.textContent = evs.slice(0, 2).join(', ') || '—';
-      tdEv.title = evs.join(', ');
       tr.appendChild(tdEv);
 
       tbody.appendChild(tr);
@@ -899,38 +652,10 @@
     table.appendChild(tbody);
     tableWrap.appendChild(table);
     container.appendChild(tableWrap);
-
-    var summary = el('div', 'cap-diff-summary');
-    summary.style.marginTop = '8px';
-    summary.style.fontSize = '.78rem';
-    if (newCount) {
-      summary.innerHTML = '<strong style="color:var(--critical)">' + newCount + ' NEW_CAPABILITY</strong> since baseline — from <code style="font-family:var(--mono)">' + escapeHtml(baselineCaps.join(', ') || '(none)') + '</code> → <code style="font-family:var(--mono)">' + escapeHtml(currentCaps.join(', ') || '(none)') + '</code>. This is the signal that matters even if heuristic score is low.';
-    } else {
-      summary.textContent = 'No new capabilities since baseline. Baseline caps: ' + (baselineCaps.join(', ') || '(none)') + ' → current: ' + (currentCaps.join(', ') || '(none)') ;
-      summary.style.color = 'var(--text-muted)';
-    }
-    container.appendChild(summary);
-
-    // matrix bar viz: tiny heatmap row
-    var bar = el('div', 'cap-matrix-bar');
-    bar.setAttribute('aria-hidden', 'true');
-    allCapsUnion.forEach(function (cap) {
-      var inBase = baselineCaps.indexOf(cap) !== -1;
-      var inCurr = currentCaps.indexOf(cap) !== -1;
-      var cell = el('span', 'cap-matrix-cell');
-      if (inCurr && !inBase) { cell.classList.add('cap-matrix-cell--new'); cell.title = cap + ' NEW'; }
-      else if (inCurr && inBase) { cell.classList.add('cap-matrix-cell--same'); cell.title = cap + ' same'; }
-      else if (!inCurr && inBase) { cell.classList.add('cap-matrix-cell--removed'); cell.title = cap + ' removed'; }
-      else cell.classList.add('cap-matrix-cell--none');
-      bar.appendChild(cell);
-    });
-    container.appendChild(bar);
     container.dataset.newCaps = String(newCount);
   }
 
-  // ---------- 4. EVIDENCE EXPLORER HELPERS ----------
-  // The richer explorer is mostly implemented via enhanced demo.js table with toolbar.
-  // This module provides filter logic that demo.js can reuse.
+  // ---------- 4. EVIDENCE FILTER HELPER ----------
   function filterEvidenceRows(rows, query, detectorFilter, confidenceFilter, fileFilter) {
     var q = (query || '').toLowerCase().trim();
     return rows.filter(function (r) {
@@ -945,7 +670,7 @@
     });
   }
 
-  // expose
+  // Export to window
   window.HookAuditDashboard = {
     computeDashboardMetrics: computeDashboardMetrics,
     renderDashboard: renderDashboard,
@@ -959,9 +684,6 @@
         var btn = wrap.querySelector('[data-filter="' + kind + '"]');
         if (btn) btn.click();
       }
-      document.querySelectorAll('.chip[data-filter]').forEach(function (c) {
-        c.classList.toggle('is-active', c.dataset.filter === kind);
-      });
     }
   };
 })();
