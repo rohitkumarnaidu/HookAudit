@@ -231,12 +231,8 @@
       markActive('discover');
       return;
     }
-    // After scan: 01-04 done (green), 05 WATCH stays neutral grey until diff — selection (is-current) provides black highlight, not stuck
-    markDone('discover'); markDone('detect'); markDone('trace'); markDone('analyze');
-    if (baselineRecord && diffResult) {
-      markDone('watch');
-    }
-    // else WATCH remains inactive (grey) — prevents last always black
+    // A+: after scan all 01-05 done green — non-selected same, black only via is-current selection
+    markDone('discover'); markDone('detect'); markDone('trace'); markDone('analyze'); markDone('watch');
   }
 
   function renderSelectedPath() {
