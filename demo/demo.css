@@ -191,7 +191,7 @@ h4,.h4{font-size:14px;font-weight:600;line-height:1.4}
 .step-dot{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0}
 .step.is-active .step-dot{background:var(--surface)}
 .step.is-done .step-dot{background:var(--success)}
-.step.is-current{outline:2px solid var(--focus);outline-offset:2px}
+.step.is-current{border-color:var(--focus);box-shadow:0 0 0 3px rgba(25,113,194,.18)}
 .step.is-current .step-num{border-color:var(--focus)}
 
 /* ═══════════════════════════════════════════
