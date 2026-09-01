@@ -1,12 +1,12 @@
 # HookAudit Documentation
 
-This directory contains the working source of truth for HookAudit — from product idea through implementation specification to user-facing guides. All claims are reconciled against `bin/hookaudit.js` (2357 lines, SHA256 A3C45D8…) + observed `npm test` 87/87.
+This directory contains the working source of truth for HookAudit - from product idea through implementation specification to user-facing guides. All claims are reconciled against `bin/hookaudit.js` (2357 lines, SHA256 A3C45D8…) + observed `npm test` 87/87.
 
 ## Structure (enterprise, Diataxis)
 
 | Path | Quadrant | Owns | Audience |
 |------|----------|------|----------|
-| `tutorial-quickstart.md` | Tutorial | Your first scan in 5 minutes — zero to `NEW_CAPABILITY` | Newcomer |
+| `tutorial-quickstart.md` | Tutorial | Your first scan in 5 minutes - zero to `NEW_CAPABILITY` | Newcomer |
 | `howto-scan.md` | How-to | Scan and gate CI (`--json/--sarif/--html/--strict/branches`) | User who knows basics |
 | `howto-baseline.md` | How-to | `baseline → diff` trust workflow with `NEW_CAPABILITY` | User who trusts a repo |
 | `howto-custom-policy.md` | How-to | `policy.json/yaml/toml` `blockOn/warnOn` | Power user |
@@ -24,9 +24,9 @@ This directory contains the working source of truth for HookAudit — from produ
 
 ## Authority (zero-trust)
 
-Source-of-truth order: `1 CURRENT SOURCE CODE → 2 CURRENT TESTS + OBSERVED BEHAVIOR → 3 OFFICIAL HACKATHON RULES → 4 CURRENT ECOSYSTEM DOCS → 5 CURRENT SPEC/MVP CONTRACT → 6 RULES.md → 7 README/SECURITY/LIMITATIONS/STDLIB → 8 CURRENT RESEARCH → 9 HISTORICAL AUDITS`. When sources conflict, report `OLD CLAIM / CURRENT IMPLEMENTATION / CORRECT FACT` — never silently merge (see `README.md` “Implementation truth”).
+Source-of-truth order: `1 CURRENT SOURCE CODE → 2 CURRENT TESTS + OBSERVED BEHAVIOR → 3 OFFICIAL HACKATHON RULES → 4 CURRENT ECOSYSTEM DOCS → 5 CURRENT SPEC/MVP CONTRACT → 6 RULES.md → 7 README/SECURITY/LIMITATIONS/STDLIB → 8 CURRENT RESEARCH → 9 HISTORICAL AUDITS`. When sources conflict, report `OLD CLAIM / CURRENT IMPLEMENTATION / CORRECT FACT` - never silently merge (see `README.md` “Implementation truth”).
 
-Research is evidence, not runtime truth. No deletions without `Get-FileHash SHA256` verification — see `research/manifest.md`.
+Research is evidence, not runtime truth. No deletions without `Get-FileHash SHA256` verification - see `research/manifest.md`.
 
 ## Hygiene (2026-09-01)
 

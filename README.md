@@ -1,15 +1,15 @@
 # hookaudit
 
 A zero-dependency local scanner for **auto-executing AI-agent, editor,
-and package-lifecycle hooks** — the class of files that silently run
+and package-lifecycle hooks** - the class of files that silently run
 commands the moment you open a repository or install its dependencies.
 
-Track: **E — Security & Crypto Utilities** ("local security scanner" /
+Track: **E - Security & Crypto Utilities** ("local security scanner" /
 "file integrity tooling").
 
-**Live demo:** [rohitkumarnaidu.github.io/HookAudit](https://rohitkumarnaidu.github.io/HookAudit/) — zero-install browser demo (GH Pages, `file://` compatible) · **Local demo:** [`demo/index.html`](./demo/index.html)
+**Live demo:** [rohitkumarnaidu.github.io/HookAudit](https://rohitkumarnaidu.github.io/HookAudit/) - zero-install browser demo (GH Pages, `file://` compatible) · **Local demo:** [`demo/index.html`](./demo/index.html)
 
-> **One-line pitch:** HookAudit is a **repository execution-topology auditor** — not a generic hook scanner. It answers *What can this repository cause to execute, through which trigger, with which reachable capabilities, and what changed since I trusted it?*
+> **One-line pitch:** HookAudit is a **repository execution-topology auditor** - not a generic hook scanner. It answers *What can this repository cause to execute, through which trigger, with which reachable capabilities, and what changed since I trusted it?*
 
 ```mermaid
 graph TD
@@ -36,7 +36,7 @@ packages) and, beyond the usual `npm install`-time payload, committed
 two files into every branch it could reach: `.claude/settings.json`
 with a `SessionStart` hook, and `.vscode/tasks.json` with a task set
 to run on `folderOpen`. Each hook pointed at a dropper script sitting
-in *the other tool's* directory — a "cross-linking" trick meant to
+in *the other tool's* directory - a "cross-linking" trick meant to
 make either file look, on a casual read, like it belongs to a
 different tool. The result: cloning the repository and simply opening
 it in Claude Code or VS Code was enough to run the payload. No
@@ -57,7 +57,7 @@ in CI.
 
 ```mermaid
 flowchart LR
-    subgraph Manual[Today — manual]
+    subgraph Manual[Today - manual]
         M1[open .claude/settings.json] --> M2[open .vscode/tasks.json]
         M2 --> M3[eyeball for hooks]
         M3 --> M4[repeat per branch]
@@ -75,7 +75,7 @@ flowchart LR
 ## What it does
 
 `hookaudit` is a **repository execution-topology auditor**. Pipeline
-`DISCOVER → NORMALIZE → RESOLVE → GRAPH → INFER → EXPLAIN → BASELINE → DIFF` — the graph is the central artifact.
+`DISCOVER → NORMALIZE → RESOLVE → GRAPH → INFER → EXPLAIN → BASELINE → DIFF` - the graph is the central artifact.
 
 ```mermaid
 flowchart TD
@@ -91,14 +91,14 @@ flowchart TD
     O --> L[Baseline / Diff<br/>schemaVersion 2 + NEW_CAPABILITY]
 ```
 
-It walks a project for twelve known auto-executing surfaces — Claude
+It walks a project for twelve known auto-executing surfaces - Claude
 Code hook/MCP config, VS Code tasks/settings, Cursor rules, Gemini
 and Codex config, npm lifecycle scripts, git hooks, Husky hooks,
-pre-commit config, and GitHub Actions `on: push` + `run:` — and:
+pre-commit config, and GitHub Actions `on: push` + `run:` - and:
 
 1. **Normalizes** each surface to `ExecutionSurface {sourcePath, surfaceType, triggerType, command: CommandSpec{raw, executable, args, shell, references, isDynamic}, capabilities, evidence, confidence}` with field-accurate evidence (`hooks.SessionStart[0].hooks[0].command`, `jobs.build.steps[0].run`).
 
-2. **Resolves references** statically: `config → script → script → helper` including cross-tool links, with `resolveInsideRepository`, `lstat` symlink safety, `CYCLE_DETECTED`, `DEPTH_LIMIT_REACHED` (32), `DYNAMIC_EXECUTION` / `UNRESOLVED_REFERENCE` — never executing target code.
+2. **Resolves references** statically: `config → script → script → helper` including cross-tool links, with `resolveInsideRepository`, `lstat` symlink safety, `CYCLE_DETECTED`, `DEPTH_LIMIT_REACHED` (32), `DYNAMIC_EXECUTION` / `UNRESOLVED_REFERENCE` - never executing target code.
 
 3. **Materializes an execution graph**: `REPOSITORY/CONFIG/TRIGGER/COMMAND/SCRIPT/FILE/CAPABILITY` + edges `CONTAINS/TRIGGERS/EXECUTES/REFERENCES/CONNECTS_TO` with evidence per edge, plus deterministic `ExecutionPath[]`.
 
@@ -131,7 +131,7 @@ Heuristic signals (additive, mapped to capabilities):
 ## Build
 
 No build step. It's a single Node.js file with zero runtime
-dependencies — `bin/hookaudit.js` **2357 lines** (`SHA256 A3C45D8…2829B`).
+dependencies - `bin/hookaudit.js` **2357 lines** (`SHA256 A3C45D8…2829B`).
 
 ```
 git clone <this repo>
@@ -148,7 +148,7 @@ npm link
 Requires Node.js ≥ 24.0.0 (tested on v24.19.0 LTS; Node 20 reached EOL
 2026-04-30). The tool itself only needs `node:fs`, `node:path`,
 `node:crypto`, `node:util` (+ `node:zlib` for `branches`), all stable
-since Node 14–18.
+since Node 14-18.
 
 ## Run
 
@@ -165,7 +165,7 @@ hookaudit branches . --json          # local git branch comparison (no git exec)
 ```
 
 Exit codes: `0` = no policy violation; `1` = `CRITICAL` (or `WARN` with
-`--strict`) or drift was detected — safe as a CI gate or pre-`git pull`
+`--strict`) or drift was detected - safe as a CI gate or pre-`git pull`
 hook; `2` = usage / path error.
 
 All paths POSIX-normalized and deterministically sorted (Windows/Linux
@@ -179,7 +179,7 @@ node bin/hookaudit.js scan --path test/fixtures/malicious-repo
 ```
 
 The second one reproduces (with inert, synthetic placeholder commands
-— no working payload) the exact structural pattern ChainDrop used:
+- no working payload) the exact structural pattern ChainDrop used:
 a `SessionStart` hook in `.claude/settings.json` pointing into
 `.vscode/`, and a `folderOpen` task in `.vscode/tasks.json` pointing
 back into `.claude/`, downloading a runtime over the network. It's
@@ -195,12 +195,12 @@ sequenceDiagram
     C->>S: node scripts/bootstrap.mjs<br/>REFERENCES
     S->>H: helper.sh<br/>REFERENCES
     H->>N: curl | bash --download bun-runtime<br/>CONNECTS_TO REMOTE_DOWNLOAD
-    Note over C,N: CRITICAL path — automatic + runtime-bootstrap + network
+    Note over C,N: CRITICAL path - automatic + runtime-bootstrap + network
 ```
 
 ### Try it with zero setup, in a browser
 
-**Live demo (GitHub Pages): [https://rohitkumarnaidu.github.io/HookAudit/](https://rohitkumarnaidu.github.io/HookAudit/)** — no install, no Node, no server.
+**Live demo (GitHub Pages): [https://rohitkumarnaidu.github.io/HookAudit/](https://rohitkumarnaidu.github.io/HookAudit/)** - no install, no Node, no server.
 
 [`demo/index.html`](./demo/index.html) + [`index.html`](./index.html) is a self-contained page that
 runs the same detection model (ported, verified byte-identical against
@@ -212,12 +212,12 @@ GH Pages URL above: pick repo → `scan` → `baseline` → inject simulated PR 
 reserved); real scans run via `node bin/hookaudit.js`. Never `eval`/`fetch`
 at demo time.*
 
-#### GitHub Pages — one-click deploy (no build)
+#### GitHub Pages - one-click deploy (no build)
 
 `index.html` is at the repo root, so Pages can serve it with zero config:
 
 ```bash
-# Already works via file:// — no server needed:
+# Already works via file:// - no server needed:
 # Windows: start index.html
 # macOS:   open index.html
 # Linux:   xdg-open index.html
@@ -231,9 +231,9 @@ at demo time.*
 3. Select **Branch: `main` / `root`** → **Save**.
 4. Wait ~1 min → your demo is live at `https://<you>.github.io/HookAudit/`.
 
-No bundler, no env vars, no workflow required — three static files (`index.html` + `demo/engine.js` + `demo/demo.js` + `demo/demo.css`) plus `demo/sample-repository`. To validate after deploy: open the Pages URL → **Baseline & Change Demo** → **Save baseline → Simulate change → Compare** → confirm `NEW_CAPABILITY` amber row and the top badge flips to `1`.
+No bundler, no env vars, no workflow required - three static files (`index.html` + `demo/engine.js` + `demo/demo.js` + `demo/demo.css`) plus `demo/sample-repository`. To validate after deploy: open the Pages URL → **Baseline & Change Demo** → **Save baseline → Simulate change → Compare** → confirm `NEW_CAPABILITY` amber row and the top badge flips to `1`.
 
-> GH Pages is static hosting only — it hosts the *browser demo*. The CLI scanner stays local: `node bin/hookaudit.js . --json`.
+> GH Pages is static hosting only - it hosts the *browser demo*. The CLI scanner stays local: `node bin/hookaudit.js . --json`.
 
 ## Tests
 
@@ -264,21 +264,21 @@ via `node:test` (+ `node:child_process` for black-box CLI, stdlib only):
   it whenever a more specific finding already covers the same file so
   the report stays signal-dense rather than noisy.
 - **Trust-on-first-use, not a signature database.** We deliberately did
-  not ship a list of "known bad" package hashes — IOC lists go stale
+  not ship a list of "known bad" package hashes - IOC lists go stale
   within days and give false confidence. The baseline/diff model
   instead answers the question that actually matters on every pull:
   *did anything in this file change since I last looked at it?*
 - **Severity is additive, not a black box.** Every finding carries the
   literal list of reasons that produced its score, in the same
   sentence a human reviewer would use. No ML, no fixed "trust level"
-  categories — a judge (or a developer) can read the ~30 lines of
+  categories - a judge (or a developer) can read the ~30 lines of
   `RULES` and know exactly what will and won't fire.
 
 ## Limitations (said plainly, per the hackathon's honesty rule)
 
-- **Working tree + local branch walker, not all branches via `git`.** Normal scan covers working tree (no `git` exec — hidden dep forbidden). `hookaudit branches` reads committed trees via `.git/HEAD` + `refs/heads/*` + `packed-refs` + `node:zlib` (bounded 5 MiB / 64-depth / 4096 entries). Does not fetch remotes or handle packfile deltas beyond loose objects (`UNSUPPORTED_FORMAT`).
+- **Working tree + local branch walker, not all branches via `git`.** Normal scan covers working tree (no `git` exec - hidden dep forbidden). `hookaudit branches` reads committed trees via `.git/HEAD` + `refs/heads/*` + `packed-refs` + `node:zlib` (bounded 5 MiB / 64-depth / 4096 entries). Does not fetch remotes or handle packfile deltas beyond loose objects (`UNSUPPORTED_FORMAT`).
 - **No full shell/language AST.** Commands are `CommandSpec{raw, executable, args, shell, references, isDynamic}` via light tokenization (quotes, escaped spaces, `shell` `[|&;`$<>]`), not a full parser. `process.env.X + "/setup.sh"` → `DYNAMIC_EXECUTION` `LOW` rather than guessed.
-- **No TOML/YAML structural parsing for surfaces.** `.codex/config.toml` and `.pre-commit-config.yaml` are heuristic raw-text scans (no stdlib TOML/YAML reader). Field extraction can miss unusual multiline layout, but whole-file sweep still catches `curl`/`eval`. Policy `policy.yaml/toml` have 140/120-line subset parsers — surfaces stay heuristic (`STDLIB.md` §12-13).
+- **No TOML/YAML structural parsing for surfaces.** `.codex/config.toml` and `.pre-commit-config.yaml` are heuristic raw-text scans (no stdlib TOML/YAML reader). Field extraction can miss unusual multiline layout, but whole-file sweep still catches `curl`/`eval`. Policy `policy.yaml/toml` have 140/120-line subset parsers - surfaces stay heuristic (`STDLIB.md` §12-13).
 - **Heuristic, not exhaustive.** Tripwire requiring specific signals. An attacker avoiding all (no network, no runtime download, no cross-reference, no obfuscation, accepting `WARN` alone) would not be `CRITICAL`. Baseline/diff is the real safety net: *any* `CHANGED`/`NEW` is drift plus `NEW_CAPABILITY` where detectable.
 - **Not a sandbox.** Reads files only; never executes hooks. `hookaudit diff` on every pull is the workflow.
 
@@ -288,7 +288,7 @@ See `LIMITATIONS.md` and `SECURITY.md` for full threat model.
 flowchart TD
     A[hookaudit diff .] --> B{Drift?}
     B -->|CHANGED/NEW| C[REVIEW even if risk LOW]
-    B -->|NEW_CAPABILITY| D[BLOCK — new reachable cap]
+    B -->|NEW_CAPABILITY| D[BLOCK - new reachable cap]
     B -->|no drift| E[PASS]
     C --> F[open cited file at cited field]
     D --> F
@@ -310,7 +310,7 @@ Code, VS Code, or any agent/editor itself.
 
 **Failure modes:** false negatives are more likely than false
 positives, because every rule requires a specific, named signal to
-fire — we chose to under-flag rather than train users to ignore a
+fire - we chose to under-flag rather than train users to ignore a
 noisy tool. Baseline/diff is the compensating control.
 
 ---
