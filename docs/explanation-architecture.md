@@ -47,6 +47,8 @@ flowchart TD
 
 Graph building is bounded static analysis (`MAX_GRAPH_DEPTH=32`), never execution. Dynamic constructs become `DYNAMIC_EXECUTION` / `UNRESOLVED_REFERENCE` with `LOW` confidence — honest uncertainty rather than guessed certainty (spec §25, `LIMITATIONS.md` §5).
 
+<img src="images/hookaudit_browser_topology_graph.png" alt="HookAudit Browser Execution Topology Graph Visualization" width="100%" />
+
 ### Why product story and core architecture are separate
 
 The master prompt (§5) mandates this split for a reason. Conflating them hides product positioning:

@@ -83,6 +83,8 @@ Semantic changes:
   NEW_CAPABILITY  package.json — REMOTE_DOWNLOAD
 ```
 
+<img src="images/hookaudit_baseline_drift_diff.png" alt="HookAudit Baseline and Semantic Capability Drift Diff" width="100%" />
+
 JSON:
 
 ```bash

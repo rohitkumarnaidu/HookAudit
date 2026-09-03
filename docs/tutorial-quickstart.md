@@ -23,6 +23,8 @@ node bin/hookaudit.js --help
 
 No build step, no `npm ls` deps — `package.json` has `dependencies: {}`, `devDependencies: {}`.
 
+<img src="images/hookaudit_zero_dep_proof.png" alt="HookAudit Zero Dependency & Native Test Proof" width="100%" />
+
 ---
 
 ## Step 1 — Scan the demo repository (one command, first result in <3 steps)
@@ -60,6 +62,8 @@ Summary: 1 CRITICAL, 2 WARN, 3 high-risk path(s)
 What just happened: HookAudit discovered 3 surfaces (`.claude/settings.json` `SessionStart`, `.vscode/tasks.json` `folderOpen`, `package.json` `postinstall`), normalized them to `ExecutionSurface + CommandSpec + Evidence` (field `hooks.SessionStart[0].hooks[0].command`), resolved `bootstrap.mjs → helper.sh` statically, inferred `NETWORK_ACCESS | REMOTE_DOWNLOAD | RUNTIME_BOOTSTRAP` from `curl | bash --download bun-runtime`, and scored `CRITICAL` (automatic + runtime-bootstrap + network).
 
 If you see `PASS` or `REVIEW` instead, verify you are on `demo/sample-repository` — that fixture is the ChainDrop-like chain; `test/fixtures/clean-repo` is intentionally clean.
+
+<img src="images/hookaudit_cli_high_risk_scan.png" alt="HookAudit CLI Scan Output" width="100%" />
 
 ## Step 2 — Get machine-readable output (JSON you can `jq`)
 

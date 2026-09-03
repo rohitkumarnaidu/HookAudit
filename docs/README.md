@@ -16,6 +16,8 @@ This directory contains the working source of truth for HookAudit - from product
 | `reference-graph.md` | Reference | Nodes/edges/paths, diagnostics, determinism | Architect |
 | `explanation-architecture.md` | Explanation | Why graph-over-grep, adapter principle, zero-dep trade-offs | Architect |
 | `explanation-risk.md` | Explanation | Risk ≠ malware, confidence, `HIGH`/`CRITICAL` rules | Analyst |
+| `ZERO_DEPENDENCY_WRITEUP.md` | Explanation | 2026 Side Quest: Building a Security Scanner Without a Supply Chain | Architect / Community |
+| `FACT_CHECK_AUDIT.md` | Evidence | Zero-trust verification, screenshot catalog, and video storyboard | Auditor / Reviewer |
 | `demo/README.md` | Explanation/How-to | Browser adapter, 5 fixtures, recording script, deploy | Reviewer/demoer |
 | `research/` | Evidence | 6 canonical research reports + `manifest.md` | Historical |
 | `spec/` | Contract | Final technical spec / MVP contract + master prompt (authoritative) | Implementer |
@@ -43,3 +45,4 @@ Research is evidence, not runtime truth. No deletions without `Get-FileHash SHA2
 - CI: `howto-scan.md` → `howto-custom-policy.md` → `reference-cli.md`
 - Drift: `howto-baseline.md` → `reference-graph.md`
 - Deep dive: `explanation-architecture.md` → `explanation-risk.md` → `reference-capabilities.md`
+- Zero-Dep Postmortem: `ZERO_DEPENDENCY_WRITEUP.md` → `FACT_CHECK_AUDIT.md`

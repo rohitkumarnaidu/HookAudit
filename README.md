@@ -7,7 +7,8 @@ commands the moment you open a repository or install its dependencies.
 Track: **E - Security & Crypto Utilities** ("local security scanner" /
 "file integrity tooling").
 
-**Live demo:** [rohitkumarnaidu.github.io/HookAudit](https://rohitkumarnaidu.github.io/HookAudit/) - zero-install browser demo (GH Pages, `file://` compatible) · **Local demo:** [`demo/index.html`](./demo/index.html)
+**Live demo:** [rohitkumarnaidu.github.io/HookAudit](https://rohitkumarnaidu.github.io/HookAudit/) - zero-install browser demo (GH Pages, `file://` compatible) · **Local demo:** [`demo/index.html`](./demo/index.html)  
+**Engineering Postmortem:** [Zero-Dependency 2026 Write-Up](./docs/ZERO_DEPENDENCY_WRITEUP.md) · **Zero-Trust Audit:** [Fact-Check Report](./docs/FACT_CHECK_AUDIT.md)
 
 > **One-line pitch:** HookAudit is a **repository execution-topology auditor** - not a generic hook scanner. It answers *What can this repository cause to execute, through which trigger, with which reachable capabilities, and what changed since I trusted it?*
 
@@ -72,6 +73,12 @@ flowchart LR
     Manual -.->|replaced by| HookAudit
 ```
 
+<p align="center">
+  <img src="docs/images/hookaudit_cli_high_risk_scan.png" alt="HookAudit CLI Scan Output" width="100%" />
+  <br/>
+  <em>Figure 1: HookAudit CLI scanning demo/sample-repository, tracing a multi-hop execution path to CRITICAL.</em>
+</p>
+
 ## What it does
 
 `hookaudit` is a **repository execution-topology auditor**. Pipeline
@@ -118,6 +125,12 @@ flowchart LR
     E -->|no| G[PASS]
 ```
 
+<p align="center">
+  <img src="docs/images/hookaudit_baseline_drift_diff.png" alt="HookAudit Baseline and Semantic Capability Drift Diff" width="100%" />
+  <br/>
+  <em>Figure 4: Establishing a cryptographic baseline and catching semantic capability drift (NEW_CAPABILITY NETWORK_ACCESS).</em>
+</p>
+
 Heuristic signals (additive, mapped to capabilities):
 
 - `network-fetch` → `NETWORK_ACCESS` (`curl|wget|Invoke-WebRequest|fetch("https:`)
@@ -149,6 +162,12 @@ Requires Node.js ≥ 24.0.0 (tested on v24.19.0 LTS; Node 20 reached EOL
 2026-04-30). The tool itself only needs `node:fs`, `node:path`,
 `node:crypto`, `node:util` (+ `node:zlib` for `branches`), all stable
 since Node 14-18.
+
+<p align="center">
+  <img src="docs/images/hookaudit_zero_dep_proof.png" alt="HookAudit Zero Dependency & Native Test Proof" width="100%" />
+  <br/>
+  <em>Figure 2: Zero runtime dependencies (npm ls --all returning (empty)) and 87 native tests passing in under 2s via node:test.</em>
+</p>
 
 ## Run
 
@@ -211,6 +230,12 @@ GH Pages URL above: pick repo → `scan` → `baseline` → inject simulated PR 
 *Browser demo is an adapter over 5 inert fixtures (`example-attacker.test`
 reserved); real scans run via `node bin/hookaudit.js`. Never `eval`/`fetch`
 at demo time.*
+
+<p align="center">
+  <img src="docs/images/hookaudit_browser_topology_graph.png" alt="HookAudit Browser Execution Topology Graph" width="100%" />
+  <br/>
+  <em>Figure 3: Interactive SVG topology canvas rendering multi-hop triggers, intermediate scripts, and reachable capabilities.</em>
+</p>
 
 #### GitHub Pages - one-click deploy (no build)
 
@@ -312,6 +337,12 @@ Code, VS Code, or any agent/editor itself.
 positives, because every rule requires a specific, named signal to
 fire - we chose to under-flag rather than train users to ignore a
 noisy tool. Baseline/diff is the compensating control.
+
+## Documentation & Technical Reports
+
+- **Engineering Postmortem (Side Quest Write-Up)**: [`docs/ZERO_DEPENDENCY_WRITEUP.md`](./docs/ZERO_DEPENDENCY_WRITEUP.md) — 12-section technical postmortem on systems complexity and zero dependencies.
+- **Zero-Trust Fact-Check & Verification Audit**: [`docs/FACT_CHECK_AUDIT.md`](./docs/FACT_CHECK_AUDIT.md) — Line-by-line verification against runtime code, tests, and visual assets.
+- **Documentation Map (Diataxis)**: [`docs/README.md`](./docs/README.md) — Complete navigation map across tutorials, how-tos, reference manuals, and architecture explanations.
 
 ---
 
