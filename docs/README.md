@@ -45,4 +45,4 @@ Research is evidence, not runtime truth. No deletions without `Get-FileHash SHA2
 - CI: `howto-scan.md` → `howto-custom-policy.md` → `reference-cli.md`
 - Drift: `howto-baseline.md` → `reference-graph.md`
 - Deep dive: `explanation-architecture.md` → `explanation-risk.md` → `reference-capabilities.md`
-- Zero-Dep Postmortem: `ZERO_DEPENDENCY_WRITEUP.md` → `FACT_CHECK_AUDIT.md`
+- Zero-Dep Postmortem: [Published on DEV Community](https://dev.to/bappadala_rohithkumarna/hookaudit-building-a-supply-chain-security-scanner-without-a-supply-chain-1aec) · In-Repo: `ZERO_DEPENDENCY_WRITEUP.md` → `FACT_CHECK_AUDIT.md`

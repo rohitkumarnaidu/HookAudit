@@ -8,6 +8,7 @@ Track: **E - Security & Crypto Utilities** ("local security scanner" /
 "file integrity tooling").
 
 **Live demo:** [rohitkumarnaidu.github.io/HookAudit](https://rohitkumarnaidu.github.io/HookAudit/) - zero-install browser demo (GH Pages, `file://` compatible) · **Local demo:** [`demo/index.html`](./demo/index.html)  
+**Read on DEV Community:** [HookAudit: Building a Supply-Chain Security Scanner Without a Supply Chain](https://dev.to/bappadala_rohithkumarna/hookaudit-building-a-supply-chain-security-scanner-without-a-supply-chain-1aec)  
 **Engineering Postmortem:** [Zero-Dependency 2026 Write-Up](./docs/ZERO_DEPENDENCY_WRITEUP.md) · **Zero-Trust Audit:** [Fact-Check Report](./docs/FACT_CHECK_AUDIT.md)
 
 > **One-line pitch:** HookAudit is a **repository execution-topology auditor** - not a generic hook scanner. It answers *What can this repository cause to execute, through which trigger, with which reachable capabilities, and what changed since I trusted it?*
@@ -340,7 +341,8 @@ noisy tool. Baseline/diff is the compensating control.
 
 ## Documentation & Technical Reports
 
-- **Engineering Postmortem (Side Quest Write-Up)**: [`docs/ZERO_DEPENDENCY_WRITEUP.md`](./docs/ZERO_DEPENDENCY_WRITEUP.md) — 12-section technical postmortem on systems complexity and zero dependencies.
+- **Published on DEV Community**: [HookAudit: Building a Supply-Chain Security Scanner Without a Supply Chain](https://dev.to/bappadala_rohithkumarna/hookaudit-building-a-supply-chain-security-scanner-without-a-supply-chain-1aec) — The official public article for the Zero-Dependency 2026 Write-Up Side Quest.
+- **Engineering Postmortem (In-Repo)**: [`docs/ZERO_DEPENDENCY_WRITEUP.md`](./docs/ZERO_DEPENDENCY_WRITEUP.md) — 12-section technical postmortem on systems complexity and zero dependencies.
 - **Zero-Trust Fact-Check & Verification Audit**: [`docs/FACT_CHECK_AUDIT.md`](./docs/FACT_CHECK_AUDIT.md) — Line-by-line verification against runtime code, tests, and visual assets.
 - **Documentation Map (Diataxis)**: [`docs/README.md`](./docs/README.md) — Complete navigation map across tutorials, how-tos, reference manuals, and architecture explanations.
 

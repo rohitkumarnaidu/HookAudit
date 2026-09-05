@@ -2,6 +2,8 @@
 
 *What happens when you force a security tool to inspect untrusted code using only standard-library primitives? An engineering postmortem on systems complexity and zero dependencies.*
 
+> **Canonical Publication:** [Published on DEV Community](https://dev.to/bappadala_rohithkumarna/hookaudit-building-a-supply-chain-security-scanner-without-a-supply-chain-1aec)
+
 ---
 
 ```

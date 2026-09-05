@@ -188,7 +188,7 @@ All 4 real screenshot PNG assets have been captured from the live implementation
 | **Mermaid Diagrams** | 4 valid diagrams (Pipeline, Multi-Hop, Shared Utility, Safe Chamber) | Matches | Matches | ✅ IDENTICAL |
 | **Code Excerpts** | 4 exact verbatim excerpts from `bin/hookaudit.js` | Matches | Matches | ✅ IDENTICAL |
 | **Images Embedded** | 4 verified images with technical captions | Matches | Matches | ✅ IDENTICAL |
-| **Canonical URL** | Defensive placeholder (`# CANONICAL URL: TO BE SET AFTER PUBLICATION`) | Placeholder | Placeholder | ✅ SAFE STRATEGY |
+| **Canonical URL** | `https://dev.to/bappadala_rohithkumarna/hookaudit-building-a-supply-chain-security-scanner-without-a-supply-chain-1aec` | Live Canonical | Set in Hashnode edition | ✅ LIVE CANONICAL SET |
 
 ---
 
